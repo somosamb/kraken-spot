@@ -1,0 +1,2646 @@
+{
+  "ranked": [
+    {
+      "pair": "ETH/USD",
+      "usdVol24h": 49951420
+    },
+    {
+      "pair": "BTC/USD",
+      "usdVol24h": 49898031
+    },
+    {
+      "pair": "NEAR/USD",
+      "usdVol24h": 14829313
+    },
+    {
+      "pair": "SOL/USD",
+      "usdVol24h": 12155975
+    },
+    {
+      "pair": "SUI/USD",
+      "usdVol24h": 8457731
+    },
+    {
+      "pair": "TAO/USD",
+      "usdVol24h": 4833813
+    },
+    {
+      "pair": "QNT/USD",
+      "usdVol24h": 4663037
+    },
+    {
+      "pair": "ADA/USD",
+      "usdVol24h": 3971473
+    },
+    {
+      "pair": "TIA/USD",
+      "usdVol24h": 3841777
+    },
+    {
+      "pair": "Q/USD",
+      "usdVol24h": 3603510
+    },
+    {
+      "pair": "HYPE/USD",
+      "usdVol24h": 3545504
+    },
+    {
+      "pair": "AVAX/USD",
+      "usdVol24h": 3050725
+    },
+    {
+      "pair": "LINK/USD",
+      "usdVol24h": 2661008
+    },
+    {
+      "pair": "SAND/USD",
+      "usdVol24h": 2530491
+    },
+    {
+      "pair": "STRK/USD",
+      "usdVol24h": 2459177
+    },
+    {
+      "pair": "PUMP/USD",
+      "usdVol24h": 2449077
+    },
+    {
+      "pair": "HBAR/USD",
+      "usdVol24h": 2369655
+    },
+    {
+      "pair": "INJ/USD",
+      "usdVol24h": 2162077
+    },
+    {
+      "pair": "ZRO/USD",
+      "usdVol24h": 2126925
+    },
+    {
+      "pair": "BAT/USD",
+      "usdVol24h": 2112393
+    },
+    {
+      "pair": "LTC/USD",
+      "usdVol24h": 1894385
+    },
+    {
+      "pair": "FIL/USD",
+      "usdVol24h": 1421983
+    },
+    {
+      "pair": "UNI/USD",
+      "usdVol24h": 1386881
+    },
+    {
+      "pair": "USELESS/USD",
+      "usdVol24h": 1333292
+    },
+    {
+      "pair": "NIGHT/USD",
+      "usdVol24h": 1178144
+    },
+    {
+      "pair": "CRV/USD",
+      "usdVol24h": 1081995
+    },
+    {
+      "pair": "CC/USD",
+      "usdVol24h": 1071621
+    },
+    {
+      "pair": "ICNT/USD",
+      "usdVol24h": 1052513
+    },
+    {
+      "pair": "ENA/USD",
+      "usdVol24h": 1023901
+    },
+    {
+      "pair": "ONDO/USD",
+      "usdVol24h": 989546
+    },
+    {
+      "pair": "DRV/USD",
+      "usdVol24h": 959650
+    },
+    {
+      "pair": "FET/USD",
+      "usdVol24h": 925537
+    },
+    {
+      "pair": "PEPE/USD",
+      "usdVol24h": 859535
+    },
+    {
+      "pair": "AERO/USD",
+      "usdVol24h": 800338
+    },
+    {
+      "pair": "DOT/USD",
+      "usdVol24h": 743294
+    },
+    {
+      "pair": "AAVE/USD",
+      "usdVol24h": 742156
+    },
+    {
+      "pair": "ICP/USD",
+      "usdVol24h": 655357
+    },
+    {
+      "pair": "EIGEN/USD",
+      "usdVol24h": 649706
+    },
+    {
+      "pair": "KAS/USD",
+      "usdVol24h": 632547
+    },
+    {
+      "pair": "BCH/USD",
+      "usdVol24h": 619103
+    },
+    {
+      "pair": "ARB/USD",
+      "usdVol24h": 568663
+    },
+    {
+      "pair": "FLR/USD",
+      "usdVol24h": 567685
+    },
+    {
+      "pair": "EURC/USD",
+      "usdVol24h": 552299
+    },
+    {
+      "pair": "ALGO/USD",
+      "usdVol24h": 551420
+    },
+    {
+      "pair": "MANA/USD",
+      "usdVol24h": 546308
+    },
+    {
+      "pair": "TRX/USD",
+      "usdVol24h": 543042
+    },
+    {
+      "pair": "SPX/USD",
+      "usdVol24h": 532071
+    },
+    {
+      "pair": "SYRUP/USD",
+      "usdVol24h": 525488
+    },
+    {
+      "pair": "A/USD",
+      "usdVol24h": 508779
+    },
+    {
+      "pair": "ZEUS/USD",
+      "usdVol24h": 495947
+    },
+    {
+      "pair": "PYTH/USD",
+      "usdVol24h": 480663
+    },
+    {
+      "pair": "FARTCOIN/USD",
+      "usdVol24h": 471114
+    },
+    {
+      "pair": "SHX/USD",
+      "usdVol24h": 451665
+    },
+    {
+      "pair": "ALEO/USD",
+      "usdVol24h": 451478
+    },
+    {
+      "pair": "BNB/USD",
+      "usdVol24h": 428121
+    },
+    {
+      "pair": "AVA/USD",
+      "usdVol24h": 426808
+    },
+    {
+      "pair": "RENDER/USD",
+      "usdVol24h": 402019
+    },
+    {
+      "pair": "CAP/USD",
+      "usdVol24h": 395605
+    },
+    {
+      "pair": "PENGU/USD",
+      "usdVol24h": 393729
+    },
+    {
+      "pair": "SEI/USD",
+      "usdVol24h": 375725
+    },
+    {
+      "pair": "STX/USD",
+      "usdVol24h": 353639
+    },
+    {
+      "pair": "NIL/USD",
+      "usdVol24h": 353141
+    },
+    {
+      "pair": "TRUMP/USD",
+      "usdVol24h": 348146
+    },
+    {
+      "pair": "OP/USD",
+      "usdVol24h": 332539
+    },
+    {
+      "pair": "LIGHTER/USD",
+      "usdVol24h": 332107
+    },
+    {
+      "pair": "APT/USD",
+      "usdVol24h": 329792
+    },
+    {
+      "pair": "DASH/USD",
+      "usdVol24h": 317178
+    },
+    {
+      "pair": "LSK/USD",
+      "usdVol24h": 309613
+    },
+    {
+      "pair": "GTC/USD",
+      "usdVol24h": 307028
+    },
+    {
+      "pair": "TON/USD",
+      "usdVol24h": 268504
+    },
+    {
+      "pair": "RAY/USD",
+      "usdVol24h": 258183
+    },
+    {
+      "pair": "AKT/USD",
+      "usdVol24h": 255651
+    },
+    {
+      "pair": "GRASS/USD",
+      "usdVol24h": 254785
+    },
+    {
+      "pair": "AKE/USD",
+      "usdVol24h": 254608
+    },
+    {
+      "pair": "POL/USD",
+      "usdVol24h": 251823
+    },
+    {
+      "pair": "US/USD",
+      "usdVol24h": 248702
+    },
+    {
+      "pair": "MINA/USD",
+      "usdVol24h": 244750
+    },
+    {
+      "pair": "ASTER/USD",
+      "usdVol24h": 239363
+    },
+    {
+      "pair": "PAXG/USD",
+      "usdVol24h": 235783
+    },
+    {
+      "pair": "CAKE/USD",
+      "usdVol24h": 232211
+    },
+    {
+      "pair": "MEGA/USD",
+      "usdVol24h": 224151
+    },
+    {
+      "pair": "RSR/USD",
+      "usdVol24h": 213226
+    },
+    {
+      "pair": "JUP/USD",
+      "usdVol24h": 203829
+    },
+    {
+      "pair": "ATOM/USD",
+      "usdVol24h": 203358
+    },
+    {
+      "pair": "ZK/USD",
+      "usdVol24h": 192758
+    },
+    {
+      "pair": "MON/USD",
+      "usdVol24h": 192232
+    },
+    {
+      "pair": "STBL/USD",
+      "usdVol24h": 182893
+    },
+    {
+      "pair": "BONK/USD",
+      "usdVol24h": 180572
+    },
+    {
+      "pair": "PLUME/USD",
+      "usdVol24h": 178519
+    },
+    {
+      "pair": "KMNO/USD",
+      "usdVol24h": 173842
+    },
+    {
+      "pair": "UAI/USD",
+      "usdVol24h": 172180
+    },
+    {
+      "pair": "SHIB/USD",
+      "usdVol24h": 171863
+    },
+    {
+      "pair": "ALIGN/USD",
+      "usdVol24h": 161741
+    },
+    {
+      "pair": "BASED/USD",
+      "usdVol24h": 160730
+    },
+    {
+      "pair": "APE/USD",
+      "usdVol24h": 157342
+    },
+    {
+      "pair": "CT/USD",
+      "usdVol24h": 155889
+    },
+    {
+      "pair": "SENT/USD",
+      "usdVol24h": 148816
+    },
+    {
+      "pair": "MORPHO/USD",
+      "usdVol24h": 130938
+    },
+    {
+      "pair": "PENDLE/USD",
+      "usdVol24h": 130682
+    },
+    {
+      "pair": "S/USD",
+      "usdVol24h": 124689
+    },
+    {
+      "pair": "SUPER/USD",
+      "usdVol24h": 116948
+    },
+    {
+      "pair": "BERA/USD",
+      "usdVol24h": 115091
+    },
+    {
+      "pair": "GALA/USD",
+      "usdVol24h": 112545
+    },
+    {
+      "pair": "VELO/USD",
+      "usdVol24h": 107784
+    },
+    {
+      "pair": "USDG/USD",
+      "usdVol24h": 106725
+    },
+    {
+      "pair": "SCOR/USD",
+      "usdVol24h": 104772
+    },
+    {
+      "pair": "GRT/USD",
+      "usdVol24h": 103780
+    },
+    {
+      "pair": "ELIZAOS/USD",
+      "usdVol24h": 102196
+    },
+    {
+      "pair": "LUNA/USD",
+      "usdVol24h": 99926
+    },
+    {
+      "pair": "OOB/USD",
+      "usdVol24h": 99074
+    },
+    {
+      "pair": "SKY/USD",
+      "usdVol24h": 98477
+    },
+    {
+      "pair": "RSC/USD",
+      "usdVol24h": 97634
+    },
+    {
+      "pair": "AR/USD",
+      "usdVol24h": 94869
+    },
+    {
+      "pair": "MUBARAK/USD",
+      "usdVol24h": 94234
+    },
+    {
+      "pair": "SN75/USD",
+      "usdVol24h": 91752
+    },
+    {
+      "pair": "CHIP/USD",
+      "usdVol24h": 91362
+    },
+    {
+      "pair": "CVX/USD",
+      "usdVol24h": 90750
+    },
+    {
+      "pair": "TRAC/USD",
+      "usdVol24h": 90105
+    },
+    {
+      "pair": "NMR/USD",
+      "usdVol24h": 89518
+    },
+    {
+      "pair": "APR/USD",
+      "usdVol24h": 88194
+    },
+    {
+      "pair": "JTO/USD",
+      "usdVol24h": 85831
+    },
+    {
+      "pair": "NOS/USD",
+      "usdVol24h": 82942
+    },
+    {
+      "pair": "ZRC/USD",
+      "usdVol24h": 82753
+    },
+    {
+      "pair": "CPOOL/USD",
+      "usdVol24h": 78260
+    },
+    {
+      "pair": "RLC/USD",
+      "usdVol24h": 76520
+    },
+    {
+      "pair": "PONS/USD",
+      "usdVol24h": 75385
+    },
+    {
+      "pair": "DOS/USD",
+      "usdVol24h": 71579
+    },
+    {
+      "pair": "HNT/USD",
+      "usdVol24h": 70764
+    },
+    {
+      "pair": "MNT/USD",
+      "usdVol24h": 69328
+    },
+    {
+      "pair": "PEAQ/USD",
+      "usdVol24h": 68895
+    },
+    {
+      "pair": "LCX/USD",
+      "usdVol24h": 68375
+    },
+    {
+      "pair": "NPC/USD",
+      "usdVol24h": 68072
+    },
+    {
+      "pair": "LDO/USD",
+      "usdVol24h": 66907
+    },
+    {
+      "pair": "CFG/USD",
+      "usdVol24h": 64448
+    },
+    {
+      "pair": "SKR/USD",
+      "usdVol24h": 63987
+    },
+    {
+      "pair": "TREAD/USD",
+      "usdVol24h": 60821
+    },
+    {
+      "pair": "ALT/USD",
+      "usdVol24h": 60286
+    },
+    {
+      "pair": "AXS/USD",
+      "usdVol24h": 57799
+    },
+    {
+      "pair": "KTA/USD",
+      "usdVol24h": 57684
+    },
+    {
+      "pair": "JASMY/USD",
+      "usdVol24h": 57644
+    },
+    {
+      "pair": "FUN/USD",
+      "usdVol24h": 57116
+    },
+    {
+      "pair": "RIVER/USD",
+      "usdVol24h": 56784
+    },
+    {
+      "pair": "POND/USD",
+      "usdVol24h": 56734
+    },
+    {
+      "pair": "IP/USD",
+      "usdVol24h": 55603
+    },
+    {
+      "pair": "DOG/USD",
+      "usdVol24h": 54835
+    },
+    {
+      "pair": "KSM/USD",
+      "usdVol24h": 54766
+    },
+    {
+      "pair": "DCR/USD",
+      "usdVol24h": 54388
+    },
+    {
+      "pair": "EV/USD",
+      "usdVol24h": 53029
+    },
+    {
+      "pair": "SNEK/USD",
+      "usdVol24h": 51455
+    },
+    {
+      "pair": "LIT/USD",
+      "usdVol24h": 50920
+    },
+    {
+      "pair": "BILL/USD",
+      "usdVol24h": 50641
+    },
+    {
+      "pair": "NANO/USD",
+      "usdVol24h": 50430
+    },
+    {
+      "pair": "GNOT/USD",
+      "usdVol24h": 50300
+    },
+    {
+      "pair": "SODA/USD",
+      "usdVol24h": 49333
+    },
+    {
+      "pair": "COMP/USD",
+      "usdVol24h": 49249
+    },
+    {
+      "pair": "ETC/USD",
+      "usdVol24h": 49014
+    },
+    {
+      "pair": "OCEAN/USD",
+      "usdVol24h": 48403
+    },
+    {
+      "pair": "BRL1/USD",
+      "usdVol24h": 47765
+    },
+    {
+      "pair": "ACU/USD",
+      "usdVol24h": 47212
+    },
+    {
+      "pair": "PHA/USD",
+      "usdVol24h": 46017
+    },
+    {
+      "pair": "ORCA/USD",
+      "usdVol24h": 46016
+    },
+    {
+      "pair": "MET/USD",
+      "usdVol24h": 44437
+    },
+    {
+      "pair": "OGN/USD",
+      "usdVol24h": 43670
+    },
+    {
+      "pair": "COTI/USD",
+      "usdVol24h": 43507
+    },
+    {
+      "pair": "OMI/USD",
+      "usdVol24h": 43054
+    },
+    {
+      "pair": "BLUAI/USD",
+      "usdVol24h": 42788
+    },
+    {
+      "pair": "SYN/USD",
+      "usdVol24h": 42344
+    },
+    {
+      "pair": "ZIG/USD",
+      "usdVol24h": 42317
+    },
+    {
+      "pair": "U/USD",
+      "usdVol24h": 42042
+    },
+    {
+      "pair": "SUSHI/USD",
+      "usdVol24h": 41336
+    },
+    {
+      "pair": "QI/USD",
+      "usdVol24h": 41237
+    },
+    {
+      "pair": "AIOZ/USD",
+      "usdVol24h": 41152
+    },
+    {
+      "pair": "INIT/USD",
+      "usdVol24h": 40877
+    },
+    {
+      "pair": "PLAY/USD",
+      "usdVol24h": 40494
+    },
+    {
+      "pair": "BABY/USD",
+      "usdVol24h": 40476
+    },
+    {
+      "pair": "CHZ/USD",
+      "usdVol24h": 39011
+    },
+    {
+      "pair": "RARI/USD",
+      "usdVol24h": 38502
+    },
+    {
+      "pair": "TEL/USD",
+      "usdVol24h": 37958
+    },
+    {
+      "pair": "ETHFI/USD",
+      "usdVol24h": 37328
+    },
+    {
+      "pair": "SWEAT/USD",
+      "usdVol24h": 36775
+    },
+    {
+      "pair": "HONEY/USD",
+      "usdVol24h": 36638
+    },
+    {
+      "pair": "KNTQ/USD",
+      "usdVol24h": 35750
+    },
+    {
+      "pair": "PROS/USD",
+      "usdVol24h": 34325
+    },
+    {
+      "pair": "KULA/USD",
+      "usdVol24h": 33804
+    },
+    {
+      "pair": "GLMR/USD",
+      "usdVol24h": 33774
+    },
+    {
+      "pair": "BEAM/USD",
+      "usdVol24h": 32953
+    },
+    {
+      "pair": "ALTHEA/USD",
+      "usdVol24h": 32431
+    },
+    {
+      "pair": "DAG/USD",
+      "usdVol24h": 31800
+    },
+    {
+      "pair": "OSMO/USD",
+      "usdVol24h": 31453
+    },
+    {
+      "pair": "CFX/USD",
+      "usdVol24h": 31450
+    },
+    {
+      "pair": "ENS/USD",
+      "usdVol24h": 31142
+    },
+    {
+      "pair": "CSPR/USD",
+      "usdVol24h": 31029
+    },
+    {
+      "pair": "ZRX/USD",
+      "usdVol24h": 30862
+    },
+    {
+      "pair": "CCD/USD",
+      "usdVol24h": 30513
+    },
+    {
+      "pair": "UMXM/USD",
+      "usdVol24h": 29646
+    },
+    {
+      "pair": "ATH/USD",
+      "usdVol24h": 29073
+    },
+    {
+      "pair": "KAVA/USD",
+      "usdVol24h": 29034
+    },
+    {
+      "pair": "MOODENG/USD",
+      "usdVol24h": 28895
+    },
+    {
+      "pair": "TRUST/USD",
+      "usdVol24h": 28129
+    },
+    {
+      "pair": "RUNE/USD",
+      "usdVol24h": 27964
+    },
+    {
+      "pair": "2Z/USD",
+      "usdVol24h": 27590
+    },
+    {
+      "pair": "AVAAI/USD",
+      "usdVol24h": 27040
+    },
+    {
+      "pair": "ARKM/USD",
+      "usdVol24h": 26638
+    },
+    {
+      "pair": "PUFFER/USD",
+      "usdVol24h": 26252
+    },
+    {
+      "pair": "PARTI/USD",
+      "usdVol24h": 25991
+    },
+    {
+      "pair": "BTR/USD",
+      "usdVol24h": 25837
+    },
+    {
+      "pair": "ACH/USD",
+      "usdVol24h": 25747
+    },
+    {
+      "pair": "STABLE/USD",
+      "usdVol24h": 25249
+    },
+    {
+      "pair": "KAT/USD",
+      "usdVol24h": 25098
+    },
+    {
+      "pair": "ARC/USD",
+      "usdVol24h": 25076
+    },
+    {
+      "pair": "DEEP/USD",
+      "usdVol24h": 24900
+    },
+    {
+      "pair": "ARX/USD",
+      "usdVol24h": 24891
+    },
+    {
+      "pair": "METIS/USD",
+      "usdVol24h": 24640
+    },
+    {
+      "pair": "JOE/USD",
+      "usdVol24h": 24567
+    },
+    {
+      "pair": "CRO/USD",
+      "usdVol24h": 24550
+    },
+    {
+      "pair": "TOSHI/USD",
+      "usdVol24h": 24501
+    },
+    {
+      "pair": "KAITO/USD",
+      "usdVol24h": 24239
+    },
+    {
+      "pair": "SPK/USD",
+      "usdVol24h": 24054
+    },
+    {
+      "pair": "LAPTOP/USD",
+      "usdVol24h": 23854
+    },
+    {
+      "pair": "POPCAT/USD",
+      "usdVol24h": 23281
+    },
+    {
+      "pair": "DYDX/USD",
+      "usdVol24h": 22913
+    },
+    {
+      "pair": "MANTRA/USD",
+      "usdVol24h": 22643
+    },
+    {
+      "pair": "UFD/USD",
+      "usdVol24h": 22587
+    },
+    {
+      "pair": "SPACE/USD",
+      "usdVol24h": 22380
+    },
+    {
+      "pair": "MF/USD",
+      "usdVol24h": 22268
+    },
+    {
+      "pair": "FLUX/USD",
+      "usdVol24h": 22222
+    },
+    {
+      "pair": "TRIA/USD",
+      "usdVol24h": 21957
+    },
+    {
+      "pair": "STORJ/USD",
+      "usdVol24h": 21663
+    },
+    {
+      "pair": "PNUT/USD",
+      "usdVol24h": 21588
+    },
+    {
+      "pair": "GAME2/USD",
+      "usdVol24h": 21575
+    },
+    {
+      "pair": "JST/USD",
+      "usdVol24h": 20983
+    },
+    {
+      "pair": "ES/USD",
+      "usdVol24h": 20669
+    },
+    {
+      "pair": "ZORA/USD",
+      "usdVol24h": 20600
+    },
+    {
+      "pair": "BNKR/USD",
+      "usdVol24h": 20557
+    },
+    {
+      "pair": "SIGMA/USD",
+      "usdVol24h": 19737
+    },
+    {
+      "pair": "IMX/USD",
+      "usdVol24h": 19735
+    },
+    {
+      "pair": "IDEX/USD",
+      "usdVol24h": 19709
+    },
+    {
+      "pair": "MELANIA/USD",
+      "usdVol24h": 19622
+    },
+    {
+      "pair": "ADI/USD",
+      "usdVol24h": 19399
+    },
+    {
+      "pair": "AVNT/USD",
+      "usdVol24h": 18933
+    },
+    {
+      "pair": "CTR/USD",
+      "usdVol24h": 18445
+    },
+    {
+      "pair": "ESPORTS/USD",
+      "usdVol24h": 18159
+    },
+    {
+      "pair": "PNT/USD",
+      "usdVol24h": 18082
+    },
+    {
+      "pair": "RLS/USD",
+      "usdVol24h": 17809
+    },
+    {
+      "pair": "RE/USD",
+      "usdVol24h": 17672
+    },
+    {
+      "pair": "SGB/USD",
+      "usdVol24h": 17627
+    },
+    {
+      "pair": "MOG/USD",
+      "usdVol24h": 17415
+    },
+    {
+      "pair": "FLOKI/USD",
+      "usdVol24h": 17058
+    },
+    {
+      "pair": "BLUR/USD",
+      "usdVol24h": 16866
+    },
+    {
+      "pair": "PROMPT/USD",
+      "usdVol24h": 16558
+    },
+    {
+      "pair": "INX/USD",
+      "usdVol24h": 16326
+    },
+    {
+      "pair": "USDE/USD",
+      "usdVol24h": 16280
+    },
+    {
+      "pair": "TAC/USD",
+      "usdVol24h": 16261
+    },
+    {
+      "pair": "SOLV/USD",
+      "usdVol24h": 16162
+    },
+    {
+      "pair": "BIO/USD",
+      "usdVol24h": 15827
+    },
+    {
+      "pair": "LRC/USD",
+      "usdVol24h": 15775
+    },
+    {
+      "pair": "REQ/USD",
+      "usdVol24h": 15711
+    },
+    {
+      "pair": "BERT/USD",
+      "usdVol24h": 15651
+    },
+    {
+      "pair": "AI/USD",
+      "usdVol24h": 15288
+    },
+    {
+      "pair": "ANIME/USD",
+      "usdVol24h": 15285
+    },
+    {
+      "pair": "GWEI/USD",
+      "usdVol24h": 14996
+    },
+    {
+      "pair": "FOLD/USD",
+      "usdVol24h": 14991
+    },
+    {
+      "pair": "FLOW/USD",
+      "usdVol24h": 14976
+    },
+    {
+      "pair": "FIS/USD",
+      "usdVol24h": 14850
+    },
+    {
+      "pair": "TX/USD",
+      "usdVol24h": 14635
+    },
+    {
+      "pair": "SN51/USD",
+      "usdVol24h": 14617
+    },
+    {
+      "pair": "0G/USD",
+      "usdVol24h": 14354
+    },
+    {
+      "pair": "1INCH/USD",
+      "usdVol24h": 14275
+    },
+    {
+      "pair": "TURBO/USD",
+      "usdVol24h": 14156
+    },
+    {
+      "pair": "SNX/USD",
+      "usdVol24h": 14099
+    },
+    {
+      "pair": "EUL/USD",
+      "usdVol24h": 14077
+    },
+    {
+      "pair": "COOKIE/USD",
+      "usdVol24h": 14008
+    },
+    {
+      "pair": "RED/USD",
+      "usdVol24h": 13909
+    },
+    {
+      "pair": "FORTH/USD",
+      "usdVol24h": 13881
+    },
+    {
+      "pair": "DYM/USD",
+      "usdVol24h": 13494
+    },
+    {
+      "pair": "AIN/USD",
+      "usdVol24h": 13395
+    },
+    {
+      "pair": "OXT/USD",
+      "usdVol24h": 13334
+    },
+    {
+      "pair": "LAVA/USD",
+      "usdVol24h": 13043
+    },
+    {
+      "pair": "TREE/USD",
+      "usdVol24h": 12823
+    },
+    {
+      "pair": "API3/USD",
+      "usdVol24h": 12594
+    },
+    {
+      "pair": "CHR/USD",
+      "usdVol24h": 12463
+    },
+    {
+      "pair": "EGLD/USD",
+      "usdVol24h": 12414
+    },
+    {
+      "pair": "CLANKER/USD",
+      "usdVol24h": 12079
+    },
+    {
+      "pair": "SOSO/USD",
+      "usdVol24h": 12027
+    },
+    {
+      "pair": "GRIFFAIN/USD",
+      "usdVol24h": 11966
+    },
+    {
+      "pair": "DBR/USD",
+      "usdVol24h": 11842
+    },
+    {
+      "pair": "SAUCE/USD",
+      "usdVol24h": 11804
+    },
+    {
+      "pair": "FHE/USD",
+      "usdVol24h": 11785
+    },
+    {
+      "pair": "PIEVERSE/USD",
+      "usdVol24h": 11592
+    },
+    {
+      "pair": "CHILLHOUSE/USD",
+      "usdVol24h": 11484
+    },
+    {
+      "pair": "EURQ/USD",
+      "usdVol24h": 11397
+    },
+    {
+      "pair": "EDGEX/USD",
+      "usdVol24h": 11330
+    },
+    {
+      "pair": "POWR/USD",
+      "usdVol24h": 11323
+    },
+    {
+      "pair": "CELO/USD",
+      "usdVol24h": 11279
+    },
+    {
+      "pair": "SOMI/USD",
+      "usdVol24h": 11233
+    },
+    {
+      "pair": "PI/USD",
+      "usdVol24h": 11165
+    },
+    {
+      "pair": "LPT/USD",
+      "usdVol24h": 11131
+    },
+    {
+      "pair": "RARE/USD",
+      "usdVol24h": 11083
+    },
+    {
+      "pair": "AZTEC/USD",
+      "usdVol24h": 11011
+    },
+    {
+      "pair": "SAFE/USD",
+      "usdVol24h": 10880
+    },
+    {
+      "pair": "ST/USD",
+      "usdVol24h": 10802
+    },
+    {
+      "pair": "SLX/USD",
+      "usdVol24h": 10777
+    },
+    {
+      "pair": "GOAT/USD",
+      "usdVol24h": 10761
+    },
+    {
+      "pair": "NOT/USD",
+      "usdVol24h": 10722
+    },
+    {
+      "pair": "PRO/USD",
+      "usdVol24h": 10603
+    },
+    {
+      "pair": "MASK/USD",
+      "usdVol24h": 10536
+    },
+    {
+      "pair": "ARPA/USD",
+      "usdVol24h": 10506
+    },
+    {
+      "pair": "PROVE/USD",
+      "usdVol24h": 10498
+    },
+    {
+      "pair": "GHST/USD",
+      "usdVol24h": 10342
+    },
+    {
+      "pair": "ANKR/USD",
+      "usdVol24h": 10236
+    },
+    {
+      "pair": "ENSO/USD",
+      "usdVol24h": 10211
+    },
+    {
+      "pair": "RLUSD/USD",
+      "usdVol24h": 10184
+    },
+    {
+      "pair": "B2/USD",
+      "usdVol24h": 10161
+    },
+    {
+      "pair": "EDU/USD",
+      "usdVol24h": 10144
+    },
+    {
+      "pair": "OPEN/USD",
+      "usdVol24h": 10117
+    },
+    {
+      "pair": "GNO/USD",
+      "usdVol24h": 10109
+    },
+    {
+      "pair": "PONKE/USD",
+      "usdVol24h": 10084
+    },
+    {
+      "pair": "BLEND/USD",
+      "usdVol24h": 10019
+    },
+    {
+      "pair": "BOB/USD",
+      "usdVol24h": 10015
+    },
+    {
+      "pair": "FOLKS/USD",
+      "usdVol24h": 9942
+    },
+    {
+      "pair": "MOVR/USD",
+      "usdVol24h": 9858
+    },
+    {
+      "pair": "LOFI/USD",
+      "usdVol24h": 9787
+    },
+    {
+      "pair": "GOMINING/USD",
+      "usdVol24h": 9584
+    },
+    {
+      "pair": "RAD/USD",
+      "usdVol24h": 9576
+    },
+    {
+      "pair": "B3/USD",
+      "usdVol24h": 9513
+    },
+    {
+      "pair": "PACT/USD",
+      "usdVol24h": 9366
+    },
+    {
+      "pair": "ALKIMI/USD",
+      "usdVol24h": 9361
+    },
+    {
+      "pair": "GENIUS/USD",
+      "usdVol24h": 9300
+    },
+    {
+      "pair": "FIDA/USD",
+      "usdVol24h": 9285
+    },
+    {
+      "pair": "AVL/USD",
+      "usdVol24h": 9075
+    },
+    {
+      "pair": "GST/USD",
+      "usdVol24h": 8921
+    },
+    {
+      "pair": "PTB/USD",
+      "usdVol24h": 8895
+    },
+    {
+      "pair": "ROBO/USD",
+      "usdVol24h": 8704
+    },
+    {
+      "pair": "GIGA/USD",
+      "usdVol24h": 8478
+    },
+    {
+      "pair": "SAHARA/USD",
+      "usdVol24h": 8445
+    },
+    {
+      "pair": "LINEA/USD",
+      "usdVol24h": 8392
+    },
+    {
+      "pair": "ENJ/USD",
+      "usdVol24h": 8384
+    },
+    {
+      "pair": "CASH/USD",
+      "usdVol24h": 8222
+    },
+    {
+      "pair": "FLOCK/USD",
+      "usdVol24h": 8028
+    },
+    {
+      "pair": "JITOSOL/USD",
+      "usdVol24h": 8022
+    },
+    {
+      "pair": "USDUC/USD",
+      "usdVol24h": 7800
+    },
+    {
+      "pair": "SUP/USD",
+      "usdVol24h": 7755
+    },
+    {
+      "pair": "SYND/USD",
+      "usdVol24h": 7728
+    },
+    {
+      "pair": "GUN/USD",
+      "usdVol24h": 7674
+    },
+    {
+      "pair": "BOBA/USD",
+      "usdVol24h": 7631
+    },
+    {
+      "pair": "STG/USD",
+      "usdVol24h": 7630
+    },
+    {
+      "pair": "SAPIEN/USD",
+      "usdVol24h": 7545
+    },
+    {
+      "pair": "CELR/USD",
+      "usdVol24h": 7386
+    },
+    {
+      "pair": "MEW/USD",
+      "usdVol24h": 7341
+    },
+    {
+      "pair": "MLN/USD",
+      "usdVol24h": 7313
+    },
+    {
+      "pair": "ACT/USD",
+      "usdVol24h": 7261
+    },
+    {
+      "pair": "ESP/USD",
+      "usdVol24h": 7166
+    },
+    {
+      "pair": "HFT/USD",
+      "usdVol24h": 7039
+    },
+    {
+      "pair": "TNSR/USD",
+      "usdVol24h": 7020
+    },
+    {
+      "pair": "SWELL/USD",
+      "usdVol24h": 6966
+    },
+    {
+      "pair": "DOGS/USD",
+      "usdVol24h": 6831
+    },
+    {
+      "pair": "GFI/USD",
+      "usdVol24h": 6802
+    },
+    {
+      "pair": "FF/USD",
+      "usdVol24h": 6786
+    },
+    {
+      "pair": "AIO/USD",
+      "usdVol24h": 6711
+    },
+    {
+      "pair": "BABYSHARK/USD",
+      "usdVol24h": 6700
+    },
+    {
+      "pair": "SCRT/USD",
+      "usdVol24h": 6644
+    },
+    {
+      "pair": "UP/USD",
+      "usdVol24h": 6529
+    },
+    {
+      "pair": "ONE/USD",
+      "usdVol24h": 6467
+    },
+    {
+      "pair": "AIXBT/USD",
+      "usdVol24h": 6453
+    },
+    {
+      "pair": "DUAL/USD",
+      "usdVol24h": 6426
+    },
+    {
+      "pair": "CHEX/USD",
+      "usdVol24h": 6330
+    },
+    {
+      "pair": "ZKP/USD",
+      "usdVol24h": 6256
+    },
+    {
+      "pair": "DENT/USD",
+      "usdVol24h": 6197
+    },
+    {
+      "pair": "QTUM/USD",
+      "usdVol24h": 6090
+    },
+    {
+      "pair": "BOS/USD",
+      "usdVol24h": 6067
+    },
+    {
+      "pair": "QUAI/USD",
+      "usdVol24h": 6038
+    },
+    {
+      "pair": "SN8/USD",
+      "usdVol24h": 5803
+    },
+    {
+      "pair": "PORTAL/USD",
+      "usdVol24h": 5792
+    },
+    {
+      "pair": "T/USD",
+      "usdVol24h": 5768
+    },
+    {
+      "pair": "NEIRO/USD",
+      "usdVol24h": 5758
+    },
+    {
+      "pair": "NOCK/USD",
+      "usdVol24h": 5667
+    },
+    {
+      "pair": "KNC/USD",
+      "usdVol24h": 5646
+    },
+    {
+      "pair": "MEME/USD",
+      "usdVol24h": 5571
+    },
+    {
+      "pair": "BTT/USD",
+      "usdVol24h": 5566
+    },
+    {
+      "pair": "UNITAS/USD",
+      "usdVol24h": 5361
+    },
+    {
+      "pair": "HMSTR/USD",
+      "usdVol24h": 5312
+    },
+    {
+      "pair": "SN62/USD",
+      "usdVol24h": 5310
+    },
+    {
+      "pair": "DRIFT/USD",
+      "usdVol24h": 5268
+    },
+    {
+      "pair": "CTSI/USD",
+      "usdVol24h": 5261
+    },
+    {
+      "pair": "KERNEL/USD",
+      "usdVol24h": 5162
+    },
+    {
+      "pair": "BLESS/USD",
+      "usdVol24h": 5162
+    },
+    {
+      "pair": "GMT/USD",
+      "usdVol24h": 5113
+    },
+    {
+      "pair": "G/USD",
+      "usdVol24h": 5037
+    },
+    {
+      "pair": "OMG/USD",
+      "usdVol24h": 4910
+    },
+    {
+      "pair": "TGBP/USD",
+      "usdVol24h": 4887
+    },
+    {
+      "pair": "RAILS/USD",
+      "usdVol24h": 4886
+    },
+    {
+      "pair": "NEX/USD",
+      "usdVol24h": 4869
+    },
+    {
+      "pair": "SAGA/USD",
+      "usdVol24h": 4849
+    },
+    {
+      "pair": "IAG/USD",
+      "usdVol24h": 4783
+    },
+    {
+      "pair": "ROLL/USD",
+      "usdVol24h": 4702
+    },
+    {
+      "pair": "SXT/USD",
+      "usdVol24h": 4622
+    },
+    {
+      "pair": "BMT/USD",
+      "usdVol24h": 4613
+    },
+    {
+      "pair": "HOLO/USD",
+      "usdVol24h": 4603
+    },
+    {
+      "pair": "DGAI/USD",
+      "usdVol24h": 4559
+    },
+    {
+      "pair": "BREV/USD",
+      "usdVol24h": 4547
+    },
+    {
+      "pair": "C98/USD",
+      "usdVol24h": 4524
+    },
+    {
+      "pair": "BICO/USD",
+      "usdVol24h": 4515
+    },
+    {
+      "pair": "SC/USD",
+      "usdVol24h": 4510
+    },
+    {
+      "pair": "CAT/USD",
+      "usdVol24h": 4504
+    },
+    {
+      "pair": "AUGUR/USD",
+      "usdVol24h": 4458
+    },
+    {
+      "pair": "ALCX/USD",
+      "usdVol24h": 4451
+    },
+    {
+      "pair": "BILLY/USD",
+      "usdVol24h": 4414
+    },
+    {
+      "pair": "GAIB/USD",
+      "usdVol24h": 4352
+    },
+    {
+      "pair": "CVC/USD",
+      "usdVol24h": 4263
+    },
+    {
+      "pair": "EDGE/USD",
+      "usdVol24h": 4260
+    },
+    {
+      "pair": "IDOS/USD",
+      "usdVol24h": 4231
+    },
+    {
+      "pair": "REKT/USD",
+      "usdVol24h": 4148
+    },
+    {
+      "pair": "KGEN/USD",
+      "usdVol24h": 4111
+    },
+    {
+      "pair": "BLZ/USD",
+      "usdVol24h": 3999
+    },
+    {
+      "pair": "BAND/USD",
+      "usdVol24h": 3991
+    },
+    {
+      "pair": "TMX/USD",
+      "usdVol24h": 3961
+    },
+    {
+      "pair": "ORDER/USD",
+      "usdVol24h": 3774
+    },
+    {
+      "pair": "OPN/USD",
+      "usdVol24h": 3671
+    },
+    {
+      "pair": "AUSD/USD",
+      "usdVol24h": 3647
+    },
+    {
+      "pair": "SOFID/USD",
+      "usdVol24h": 3463
+    },
+    {
+      "pair": "AMI/USD",
+      "usdVol24h": 3453
+    },
+    {
+      "pair": "USUAL/USD",
+      "usdVol24h": 3411
+    },
+    {
+      "pair": "PRCL/USD",
+      "usdVol24h": 3304
+    },
+    {
+      "pair": "RPL/USD",
+      "usdVol24h": 3275
+    },
+    {
+      "pair": "BODEN/USD",
+      "usdVol24h": 3260
+    },
+    {
+      "pair": "TOKEN/USD",
+      "usdVol24h": 3180
+    },
+    {
+      "pair": "ATLAS/USD",
+      "usdVol24h": 3143
+    },
+    {
+      "pair": "PEP/USD",
+      "usdVol24h": 3138
+    },
+    {
+      "pair": "NES/USD",
+      "usdVol24h": 3114
+    },
+    {
+      "pair": "EWT/USD",
+      "usdVol24h": 3092
+    },
+    {
+      "pair": "THQ/USD",
+      "usdVol24h": 3089
+    },
+    {
+      "pair": "SUKU/USD",
+      "usdVol24h": 3079
+    },
+    {
+      "pair": "METH/USD",
+      "usdVol24h": 3014
+    },
+    {
+      "pair": "REZ/USD",
+      "usdVol24h": 3013
+    },
+    {
+      "pair": "MERL/USD",
+      "usdVol24h": 2991
+    },
+    {
+      "pair": "ADX/USD",
+      "usdVol24h": 2932
+    },
+    {
+      "pair": "ALICE/USD",
+      "usdVol24h": 2886
+    },
+    {
+      "pair": "SHAPE/USD",
+      "usdVol24h": 2878
+    },
+    {
+      "pair": "PUPS/USD",
+      "usdVol24h": 2852
+    },
+    {
+      "pair": "ALPHA/USD",
+      "usdVol24h": 2762
+    },
+    {
+      "pair": "UMA/USD",
+      "usdVol24h": 2683
+    },
+    {
+      "pair": "EVAA/USD",
+      "usdVol24h": 2653
+    },
+    {
+      "pair": "ASTR/USD",
+      "usdVol24h": 2591
+    },
+    {
+      "pair": "SN44/USD",
+      "usdVol24h": 2587
+    },
+    {
+      "pair": "AEVO/USD",
+      "usdVol24h": 2561
+    },
+    {
+      "pair": "FIGHT/USD",
+      "usdVol24h": 2519
+    },
+    {
+      "pair": "AUCTION/USD",
+      "usdVol24h": 2489
+    },
+    {
+      "pair": "REPPO/USD",
+      "usdVol24h": 2414
+    },
+    {
+      "pair": "DEGEN/USD",
+      "usdVol24h": 2372
+    },
+    {
+      "pair": "BNT/USD",
+      "usdVol24h": 2340
+    },
+    {
+      "pair": "LSSOL/USD",
+      "usdVol24h": 2296
+    },
+    {
+      "pair": "MSOL/USD",
+      "usdVol24h": 2287
+    },
+    {
+      "pair": "USD1/USD",
+      "usdVol24h": 2283
+    },
+    {
+      "pair": "SN64/USD",
+      "usdVol24h": 2277
+    },
+    {
+      "pair": "PRIME/USD",
+      "usdVol24h": 2246
+    },
+    {
+      "pair": "KII/USD",
+      "usdVol24h": 2222
+    },
+    {
+      "pair": "RVV/USD",
+      "usdVol24h": 2202
+    },
+    {
+      "pair": "IN/USD",
+      "usdVol24h": 2191
+    },
+    {
+      "pair": "SRM/USD",
+      "usdVol24h": 2178
+    },
+    {
+      "pair": "AB/USD",
+      "usdVol24h": 2174
+    },
+    {
+      "pair": "ANON/USD",
+      "usdVol24h": 2129
+    },
+    {
+      "pair": "APU/USD",
+      "usdVol24h": 2067
+    },
+    {
+      "pair": "POLIS/USD",
+      "usdVol24h": 2055
+    },
+    {
+      "pair": "LION/USD",
+      "usdVol24h": 2037
+    },
+    {
+      "pair": "AUDIO/USD",
+      "usdVol24h": 2029
+    },
+    {
+      "pair": "KEEP/USD",
+      "usdVol24h": 2010
+    },
+    {
+      "pair": "QUID/USD",
+      "usdVol24h": 2005
+    },
+    {
+      "pair": "HPOS10I/USD",
+      "usdVol24h": 1994
+    },
+    {
+      "pair": "DOVU/USD",
+      "usdVol24h": 1974
+    },
+    {
+      "pair": "ALLO/USD",
+      "usdVol24h": 1954
+    },
+    {
+      "pair": "SOON/USD",
+      "usdVol24h": 1928
+    },
+    {
+      "pair": "BAL/USD",
+      "usdVol24h": 1868
+    },
+    {
+      "pair": "SWARMS/USD",
+      "usdVol24h": 1842
+    },
+    {
+      "pair": "ASSET/USD",
+      "usdVol24h": 1830
+    },
+    {
+      "pair": "BIGTIME/USD",
+      "usdVol24h": 1819
+    },
+    {
+      "pair": "NEO/USD",
+      "usdVol24h": 1816
+    },
+    {
+      "pair": "TBTC/USD",
+      "usdVol24h": 1806
+    },
+    {
+      "pair": "TLM/USD",
+      "usdVol24h": 1800
+    },
+    {
+      "pair": "MIRA/USD",
+      "usdVol24h": 1797
+    },
+    {
+      "pair": "CARV/USD",
+      "usdVol24h": 1767
+    },
+    {
+      "pair": "L3/USD",
+      "usdVol24h": 1758
+    },
+    {
+      "pair": "COW/USD",
+      "usdVol24h": 1745
+    },
+    {
+      "pair": "APENFT/USD",
+      "usdVol24h": 1733
+    },
+    {
+      "pair": "RUJI/USD",
+      "usdVol24h": 1668
+    },
+    {
+      "pair": "PEPECOIN/USD",
+      "usdVol24h": 1648
+    },
+    {
+      "pair": "POLS/USD",
+      "usdVol24h": 1593
+    },
+    {
+      "pair": "OKB/USD",
+      "usdVol24h": 1569
+    },
+    {
+      "pair": "PACK/USD",
+      "usdVol24h": 1549
+    },
+    {
+      "pair": "MIM/USD",
+      "usdVol24h": 1521
+    },
+    {
+      "pair": "MXNB/USD",
+      "usdVol24h": 1508
+    },
+    {
+      "pair": "GAS/USD",
+      "usdVol24h": 1389
+    },
+    {
+      "pair": "DEBIT/USD",
+      "usdVol24h": 1317
+    },
+    {
+      "pair": "BDXN/USD",
+      "usdVol24h": 1247
+    },
+    {
+      "pair": "LQTY/USD",
+      "usdVol24h": 1214
+    },
+    {
+      "pair": "BANANAS31/USD",
+      "usdVol24h": 1195
+    },
+    {
+      "pair": "REN/USD",
+      "usdVol24h": 1169
+    },
+    {
+      "pair": "SPELL/USD",
+      "usdVol24h": 1089
+    },
+    {
+      "pair": "FXS/USD",
+      "usdVol24h": 1072
+    },
+    {
+      "pair": "GMX/USD",
+      "usdVol24h": 1065
+    },
+    {
+      "pair": "UNFI/USD",
+      "usdVol24h": 1041
+    },
+    {
+      "pair": "TRU/USD",
+      "usdVol24h": 1021
+    },
+    {
+      "pair": "DMC/USD",
+      "usdVol24h": 1015
+    },
+    {
+      "pair": "EAT/USD",
+      "usdVol24h": 971
+    },
+    {
+      "pair": "SSV/USD",
+      "usdVol24h": 964
+    },
+    {
+      "pair": "ALCH/USD",
+      "usdVol24h": 941
+    },
+    {
+      "pair": "LSETH/USD",
+      "usdVol24h": 936
+    },
+    {
+      "pair": "COQ/USD",
+      "usdVol24h": 899
+    },
+    {
+      "pair": "MYX/USD",
+      "usdVol24h": 884
+    },
+    {
+      "pair": "USAT/USD",
+      "usdVol24h": 878
+    },
+    {
+      "pair": "BLUE/USD",
+      "usdVol24h": 865
+    },
+    {
+      "pair": "LMWR/USD",
+      "usdVol24h": 862
+    },
+    {
+      "pair": "CYBER/USD",
+      "usdVol24h": 847
+    },
+    {
+      "pair": "SUNDOG/USD",
+      "usdVol24h": 815
+    },
+    {
+      "pair": "TAKE/USD",
+      "usdVol24h": 798
+    },
+    {
+      "pair": "RNBW/USD",
+      "usdVol24h": 769
+    },
+    {
+      "pair": "BGB/USD",
+      "usdVol24h": 768
+    },
+    {
+      "pair": "PERP/USD",
+      "usdVol24h": 751
+    },
+    {
+      "pair": "ME/USD",
+      "usdVol24h": 741
+    },
+    {
+      "pair": "BONZO/USD",
+      "usdVol24h": 733
+    },
+    {
+      "pair": "COPM/USD",
+      "usdVol24h": 720
+    },
+    {
+      "pair": "HSK/USD",
+      "usdVol24h": 709
+    },
+    {
+      "pair": "ELX/USD",
+      "usdVol24h": 703
+    },
+    {
+      "pair": "ZEX/USD",
+      "usdVol24h": 666
+    },
+    {
+      "pair": "ZETA/USD",
+      "usdVol24h": 644
+    },
+    {
+      "pair": "SIGN/USD",
+      "usdVol24h": 633
+    },
+    {
+      "pair": "SAMO/USD",
+      "usdVol24h": 628
+    },
+    {
+      "pair": "SUN/USD",
+      "usdVol24h": 620
+    },
+    {
+      "pair": "GIB/USD",
+      "usdVol24h": 569
+    },
+    {
+      "pair": "JAILSTOOL/USD",
+      "usdVol24h": 540
+    },
+    {
+      "pair": "USDS/USD",
+      "usdVol24h": 481
+    },
+    {
+      "pair": "CAMP/USD",
+      "usdVol24h": 442
+    },
+    {
+      "pair": "PWT/USD",
+      "usdVol24h": 434
+    },
+    {
+      "pair": "FWOG/USD",
+      "usdVol24h": 412
+    },
+    {
+      "pair": "MEZO/USD",
+      "usdVol24h": 395
+    },
+    {
+      "pair": "AUDX/USD",
+      "usdVol24h": 394
+    },
+    {
+      "pair": "MOCA/USD",
+      "usdVol24h": 384
+    },
+    {
+      "pair": "TCS/USD",
+      "usdVol24h": 352
+    },
+    {
+      "pair": "BMB/USD",
+      "usdVol24h": 331
+    },
+    {
+      "pair": "NODE/USD",
+      "usdVol24h": 315
+    },
+    {
+      "pair": "CHEEMS/USD",
+      "usdVol24h": 288
+    },
+    {
+      "pair": "DUCK/USD",
+      "usdVol24h": 275
+    },
+    {
+      "pair": "LAYER/USD",
+      "usdVol24h": 250
+    },
+    {
+      "pair": "ODOS/USD",
+      "usdVol24h": 238
+    },
+    {
+      "pair": "CTC/USD",
+      "usdVol24h": 226
+    },
+    {
+      "pair": "CMETH/USD",
+      "usdVol24h": 221
+    },
+    {
+      "pair": "UXLINK/USD",
+      "usdVol24h": 214
+    },
+    {
+      "pair": "FIDD/USD",
+      "usdVol24h": 170
+    },
+    {
+      "pair": "CHECK/USD",
+      "usdVol24h": 168
+    },
+    {
+      "pair": "LCAP/USD",
+      "usdVol24h": 151
+    },
+    {
+      "pair": "SONIC/USD",
+      "usdVol24h": 127
+    },
+    {
+      "pair": "USDSM/USD",
+      "usdVol24h": 124
+    },
+    {
+      "pair": "USTABLES/USD",
+      "usdVol24h": 111
+    },
+    {
+      "pair": "CLOUD/USD",
+      "usdVol24h": 98
+    },
+    {
+      "pair": "APXUSD/USD",
+      "usdVol24h": 88
+    },
+    {
+      "pair": "DOLO/USD",
+      "usdVol24h": 77
+    },
+    {
+      "pair": "BADGER/USD",
+      "usdVol24h": 55
+    },
+    {
+      "pair": "USDSUI/USD",
+      "usdVol24h": 46
+    },
+    {
+      "pair": "NOBODY/USD",
+      "usdVol24h": 45
+    },
+    {
+      "pair": "CORN/USD",
+      "usdVol24h": 38
+    },
+    {
+      "pair": "USDPT/USD",
+      "usdVol24h": 36
+    },
+    {
+      "pair": "FRNT/USD",
+      "usdVol24h": 32
+    },
+    {
+      "pair": "QCAD/USD",
+      "usdVol24h": 29
+    },
+    {
+      "pair": "EUROP/USD",
+      "usdVol24h": 28
+    },
+    {
+      "pair": "OBOL/USD",
+      "usdVol24h": 27
+    },
+    {
+      "pair": "OUSD/USD",
+      "usdVol24h": 18
+    },
+    {
+      "pair": "USDGO/USD",
+      "usdVol24h": 15
+    },
+    {
+      "pair": "USDQ/USD",
+      "usdVol24h": 10
+    },
+    {
+      "pair": "FOREST/USD",
+      "usdVol24h": 5
+    },
+    {
+      "pair": "RIZE/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "ACA/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "ACX/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "AI3/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "BKS/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "BNC/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "CLV/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "CQT/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "CXT/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "DNA/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "EPT/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "ESX/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "EURR/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "GAIA/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "GHIBLI/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "HDX/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "HIPPO/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "HOUSE/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "IR/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "JUNO/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "KEY/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "KIN/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "KOBAN/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "KP3R/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "LOCKIN/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "M/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "MAT/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "MIR/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "MNGO/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "MULTI/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "NTRN/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "OMNI/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "PIPE/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "RBC/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "SBR/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "SCA/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "SIDEKICK/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "SLAY/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "TREMP/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "U2U/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "USDR/USD",
+      "usdVol24h": 0
+    },
+    {
+      "pair": "VANRY/USD",
+      "usdVol24h": 0
+    }
+  ],
+  "selected": [
+    {
+      "pair": "ETH/USD",
+      "usdVol24h": 49951420
+    },
+    {
+      "pair": "BTC/USD",
+      "usdVol24h": 49898031
+    },
+    {
+      "pair": "NEAR/USD",
+      "usdVol24h": 14829313
+    },
+    {
+      "pair": "SOL/USD",
+      "usdVol24h": 12155975
+    },
+    {
+      "pair": "SUI/USD",
+      "usdVol24h": 8457731
+    },
+    {
+      "pair": "TAO/USD",
+      "usdVol24h": 4833813
+    },
+    {
+      "pair": "QNT/USD",
+      "usdVol24h": 4663037
+    },
+    {
+      "pair": "ADA/USD",
+      "usdVol24h": 3971473
+    },
+    {
+      "pair": "TIA/USD",
+      "usdVol24h": 3841777
+    },
+    {
+      "pair": "Q/USD",
+      "usdVol24h": 3603510
+    },
+    {
+      "pair": "HYPE/USD",
+      "usdVol24h": 3545504
+    },
+    {
+      "pair": "AVAX/USD",
+      "usdVol24h": 3050725
+    },
+    {
+      "pair": "LINK/USD",
+      "usdVol24h": 2661008
+    },
+    {
+      "pair": "SAND/USD",
+      "usdVol24h": 2530491
+    },
+    {
+      "pair": "STRK/USD",
+      "usdVol24h": 2459177
+    },
+    {
+      "pair": "PUMP/USD",
+      "usdVol24h": 2449077
+    },
+    {
+      "pair": "HBAR/USD",
+      "usdVol24h": 2369655
+    },
+    {
+      "pair": "INJ/USD",
+      "usdVol24h": 2162077
+    },
+    {
+      "pair": "ZRO/USD",
+      "usdVol24h": 2126925
+    },
+    {
+      "pair": "BAT/USD",
+      "usdVol24h": 2112393
+    },
+    {
+      "pair": "LTC/USD",
+      "usdVol24h": 1894385
+    },
+    {
+      "pair": "FIL/USD",
+      "usdVol24h": 1421983
+    },
+    {
+      "pair": "UNI/USD",
+      "usdVol24h": 1386881
+    },
+    {
+      "pair": "USELESS/USD",
+      "usdVol24h": 1333292
+    },
+    {
+      "pair": "NIGHT/USD",
+      "usdVol24h": 1178144
+    },
+    {
+      "pair": "CRV/USD",
+      "usdVol24h": 1081995
+    },
+    {
+      "pair": "CC/USD",
+      "usdVol24h": 1071621
+    },
+    {
+      "pair": "ICNT/USD",
+      "usdVol24h": 1052513
+    },
+    {
+      "pair": "ENA/USD",
+      "usdVol24h": 1023901
+    },
+    {
+      "pair": "ONDO/USD",
+      "usdVol24h": 989546
+    },
+    {
+      "pair": "DRV/USD",
+      "usdVol24h": 959650
+    },
+    {
+      "pair": "FET/USD",
+      "usdVol24h": 925537
+    },
+    {
+      "pair": "PEPE/USD",
+      "usdVol24h": 859535
+    },
+    {
+      "pair": "AERO/USD",
+      "usdVol24h": 800338
+    },
+    {
+      "pair": "DOT/USD",
+      "usdVol24h": 743294
+    },
+    {
+      "pair": "AAVE/USD",
+      "usdVol24h": 742156
+    },
+    {
+      "pair": "ICP/USD",
+      "usdVol24h": 655357
+    },
+    {
+      "pair": "EIGEN/USD",
+      "usdVol24h": 649706
+    },
+    {
+      "pair": "KAS/USD",
+      "usdVol24h": 632547
+    },
+    {
+      "pair": "BCH/USD",
+      "usdVol24h": 619103
+    },
+    {
+      "pair": "ARB/USD",
+      "usdVol24h": 568663
+    },
+    {
+      "pair": "FLR/USD",
+      "usdVol24h": 567685
+    },
+    {
+      "pair": "EURC/USD",
+      "usdVol24h": 552299
+    },
+    {
+      "pair": "ALGO/USD",
+      "usdVol24h": 551420
+    },
+    {
+      "pair": "MANA/USD",
+      "usdVol24h": 546308
+    },
+    {
+      "pair": "TRX/USD",
+      "usdVol24h": 543042
+    },
+    {
+      "pair": "SPX/USD",
+      "usdVol24h": 532071
+    },
+    {
+      "pair": "SYRUP/USD",
+      "usdVol24h": 525488
+    },
+    {
+      "pair": "A/USD",
+      "usdVol24h": 508779
+    },
+    {
+      "pair": "ZEUS/USD",
+      "usdVol24h": 495947
+    }
+  ]
+}
