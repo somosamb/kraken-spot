@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-const KRAKEN = '/home/oc/bin/kraken';
-const DIR = '/home/oc/kraken-spot';
+const KRAKEN = process.env.KRAKEN_BIN || 'kraken';
+const DIR = process.env.KS_DIR || new URL('.', import.meta.url).pathname.replace(/\/$/, '');
 const STABLES = new Set(['USDT','USDC','DAI','BUSD','TUSD','USD','EUR','GBP','AUD','CAD','CHF','JPY','PYUSD','FDUSD','USDD','USDP']);
 const pairsRaw = execFileSync(KRAKEN, ['pairs', '-o', 'json'], { encoding: 'utf8', maxBuffer: 64*1024*1024 });
 const pairs = JSON.parse(pairsRaw.trim().split('\n').pop());

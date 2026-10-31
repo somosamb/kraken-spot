@@ -1,5 +1,7 @@
 #!/bin/sh
-for p in $(ps -eo pid=,args= | awk '/node runner\.mjs/ && !/awk/ {print $1}'); do kill "$p" 2>/dev/null; done
-for p in $(ps -eo pid=,args= | awk '/sh watchdog\.sh/ && !/awk/ {print $1}'); do kill "$p" 2>/dev/null; done
+# Stop watchdog first (so it cannot revive the runner), then the runner and any in-flight cycle.
+pkill -f "^(/bin/)?sh (\./)?watchdog\.sh$" 2>/dev/null
+pkill -f "^node runner\.mjs" 2>/dev/null
 sleep 2
+pkill -f "trader\.mjs loop" 2>/dev/null
 echo done

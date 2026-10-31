@@ -1,37 +1,20 @@
-#!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-const DIR = '/home/oc/kraken-spot';
-const KRAKEN = '/home/oc/bin/kraken';
+#!/bin/sh
+# Health check + self-heal: ensures the watchdog is up (it, in turn, keeps the runner up).
+# Never revives after a confirmed PASS/BUST (HALTED file).
+cd "$(dirname "$0")" || exit 1
 
-function sh(cmd) { return execFileSync('sh', ['-c', cmd], { encoding: 'utf8' }); }
-const ps = execFileSync('ps', ['-eo', 'pid,args']).toString();
-const runnerLines = ps.split('\n').filter((l) => /^\s*\d+\s+(?:[\w./-]*\/)?node runner\.mjs(?:\s|$)/.test(l));
-const wdLines = ps.split('\n').filter((l) => /^\s*\d+\s+(?:[\w./-]*\/)?sh watchdog\.sh\s*$/.test(l));
+runners=$(pgrep -fc "^node runner\.mjs")
+watchdogs=$(pgrep -fc "^(/bin/)?sh (\./)?watchdog\.sh$")
+echo "runner: $runners  watchdog: $watchdogs"
 
-let state = null;
-try { state = JSON.parse(readFileSync(`${DIR}/state.json`, 'utf8')); } catch {}
-const finished = state && (state.status === 'PASS' || state.status === 'BUST');
+if [ -f HALTED ]; then
+  echo "HALTED: $(cat HALTED) — not reviving. Delete HALTED to resume."
+  exit 0
+fi
 
-console.log(`runner: ${runnerLines.length}  watchdog: ${wdLines.length}  status: ${state?.status ?? 'unknown'}`);
-
-if (finished) {
-  console.log('Challenge finished — not reviving.');
-  process.exit(0);
-}
-if (runnerLines.length === 0) {
-  console.log('Reviving runner...');
-  const mode = existsSync(`${DIR}/ENTRY_ENABLED`) ? 'auto' : 'noentry';
-  const args = mode === 'noentry' ? ['runner.mjs', 'noentry'] : ['runner.mjs'];
-  execFileSync('setsid', ['nohup', 'node', ...args], { cwd: DIR, stdio: 'ignore', detached: true });
-  // wait
-  const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  sleep(6000);
-  const ps2 = execFileSync('ps', ['-eo', 'pid,args']).toString();
-  const r2 = ps2.split('\n').filter((l) => /^\s*\d+\s+(?:[\w./-]*\/)?node runner\.mjs(?:\s|$)/.test(l));
-  console.log(`runner now: ${r2.length}`);
-}
-if (wdLines.length === 0) {
-  console.log('Reviving watchdog...');
-  execFileSync('sh', ['-c', `cd ${DIR} && setsid nohup sh watchdog.sh >/dev/null 2>>runner.err </dev/null &`], { stdio: 'ignore' });
-}
+if [ "$watchdogs" -eq 0 ]; then
+  echo "Reviving watchdog..."
+  setsid nohup sh watchdog.sh >/dev/null 2>>watchdog.err < /dev/null &
+  sleep 5
+  echo "runner now: $(pgrep -fc "^node runner\.mjs")  watchdog now: $(pgrep -fc "^(/bin/)?sh (\./)?watchdog\.sh$")"
+fi

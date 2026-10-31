@@ -1,11 +1,19 @@
 #!/usr/bin/env node
-import { snapshot, RULES, DIR } from './ctl.mjs';
-import { appendFileSync, writeFileSync, statSync, renameSync } from 'node:fs';
+/**
+ * Daemon: runs one trader cycle every TICK_MS in a child process, snapshots equity,
+ * and stops for good (writing HALTED) on a confirmed PASS/BUST.
+ */
+import { snapshot, confirmedVerdict, RULES, DIR, HALTED } from './ctl.mjs';
+import { appendFileSync, writeFileSync, statSync, renameSync, unlinkSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const LOG = `${DIR}/bot.log`;
-const TICK_MS = 45_000;
+const ALERTS = `${DIR}/alerts.log`;
+const SENTINEL = `${DIR}/FAILURE_SENTINEL`;
 const STATE_FILE = `${DIR}/runner.state.json`;
+const TICK_MS = 45_000;
+const CYCLE_TIMEOUT_MS = 600_000;
+const MAX_FAILURES = 8;
 let cycle = 0;
 let failures = 0;
 
@@ -18,51 +26,55 @@ function log(level, msg) {
   appendFileSync(LOG, line + '\n');
   console.log(line);
 }
+function alertLog(msg) { appendFileSync(ALERTS, `${new Date().toISOString()} ${msg}\n`); }
 function setRunnerState(o) {
   writeFileSync(STATE_FILE, JSON.stringify({ cycle, ts: new Date().toISOString(), ...o }, null, 2));
 }
-const CYCLE_TIMEOUT_MS = 600_000;
+
 function runCycle(mode) {
   return new Promise((resolve) => {
-    const args = mode === 'noentry'
-      ? [`${DIR}/trader.mjs`, 'loop', 'noentry']
-      : [`${DIR}/trader.mjs`, 'loop'];
-    const p = spawn('node', args, { cwd: DIR, stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '', err = '';
-    const timer = setTimeout(() => { err = `cycle exceeded ${CYCLE_TIMEOUT_MS/1000}s — killed`; p.kill('SIGKILL'); }, CYCLE_TIMEOUT_MS);
+    const args = [`${DIR}/trader.mjs`, 'loop', ...(mode === 'noentry' ? ['noentry'] : [])];
+    const p = spawn(process.execPath, args, { cwd: DIR, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '', timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; p.kill('SIGKILL'); }, CYCLE_TIMEOUT_MS);
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', (d) => (err += d));
     p.on('close', (code) => {
       clearTimeout(timer);
       let parsed = null;
       try { parsed = JSON.parse(out.trim().split('\n').pop()); } catch { /* ignore */ }
-      resolve({ code, out, err: err.trim(), parsed });
+      if (timedOut) err = `cycle exceeded ${CYCLE_TIMEOUT_MS / 1000}s — killed`;
+      resolve({ code, err: err.trim(), parsed, timedOut });
     });
   });
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
-  log('INFO', `=== spot paper runner started | start $${RULES.start} | target $${RULES.target} (+12%) | floor $${RULES.floor} (-3%) | spot paper, long-only, screening ===`);
+  if (existsSync(HALTED)) {
+    log('INFO', `HALTED file present (${HALTED}) — not starting. Delete it to resume.`);
+    return;
+  }
+  const mode = process.argv.includes('noentry') ? 'noentry' : 'auto';
+  log('INFO', `=== spot paper runner started | mode ${mode} | start $${RULES.start} | target $${RULES.target} | floor $${RULES.floor} ===`);
 
   while (true) {
     cycle++;
-    const runMode = process.argv.includes('noentry') ? 'noentry' : 'auto';
-const { code, out, err, parsed } = await runCycle(runMode);
+    const { code, err, parsed, timedOut } = await runCycle(mode);
 
-    if (((err || code !== 0) && !parsed) || parsed?.error) {
+    if (timedOut || ((err || code !== 0) && !parsed) || parsed?.error) {
       failures++;
       const detail = (parsed?.error || err || `exit ${code}`).slice(0, 300);
       log('ERROR', `cycle ${cycle} failed (exit ${code}): ${detail}`);
       setRunnerState({ status: 'ERROR', error: detail });
-      if (failures >= 8) { log('FATAL', 'too many consecutive failures — halting for manual review'); break; }
-      // sentinel
-      try { writeFileSync(`${DIR}/FAILURE_SENTINEL`, `${new Date().toISOString()} ${detail}\n`); } catch {}
+      try { writeFileSync(SENTINEL, `${new Date().toISOString()} ${detail}\n`); } catch { /* ignore */ }
+      if (failures >= MAX_FAILURES) { log('FATAL', 'too many consecutive failures — halting for manual review'); break; }
       await sleep(Math.min(60_000, 15_000 * failures));
       continue;
     }
     failures = 0;
-    try { require('node:fs').unlinkSync(`${DIR}/FAILURE_SENTINEL`); } catch {}
+    try { unlinkSync(SENTINEL); } catch { /* none */ }
+    if (parsed?.halted) { log('INFO', 'trader reports HALTED — stopping'); break; }
 
     let g;
     try { g = snapshot('runner'); }
@@ -77,33 +89,30 @@ const { code, out, err, parsed } = await runCycle(runMode);
       `pnl=${g.pnl >= 0 ? '+' : ''}${g.pnl.toFixed(2)}%`,
       `prog=${g.progress.toFixed(1)}%`,
       `pos=${parsed?.positions ?? 0}`,
+      g.source !== 'venue' ? `src=${g.source}${g.rejected != null ? `(venue $${g.rejected.toFixed(2)} rejected)` : ''}` : null,
       parsed?.closed?.length ? `closed=[${parsed.closed.join('; ')}]` : null,
       parsed?.entered?.length ? `entry=[${parsed.entered.join('; ')}]` : null,
-      parsed?.near ? `near=[${parsed.near.join(',')}]` : null,
+      parsed?.near?.length ? `near=[${parsed.near.join(',')}]` : null,
+      parsed?.frozen ? 'FROZEN' : null,
     ].filter(Boolean).join(' ');
     log('INFO', line);
-    if (parsed?.closed?.length) {
-      for (const c of parsed.closed) alertLog(c);
-    }
+    for (const c of parsed?.closed ?? []) alertLog(c);
     setRunnerState({ status: g.status, equity: g.cur, progress: +g.progress.toFixed(2) });
 
-    if (g.status === 'PASS') {
-      log('PASS', `🎉 PASSED — equity $${g.cur.toFixed(2)}`);
-      setRunnerState({ status: 'PASS', equity: g.cur, final: true });
-      break;
-    }
-    if (g.status === 'BUST') {
-      log('BUST', `💀 GAME OVER — equity $${g.cur.toFixed(2)}`);
-      setRunnerState({ status: 'BUST', equity: g.cur, final: true });
-      break;
+    if (g.status !== 'RUNNING') {
+      const cv = confirmedVerdict(g.equity);
+      if (cv.verdict === 'RUNNING') {
+        log('WARN', `terminal reading not confirmed, ignored: ${JSON.stringify(cv.glitch)}`);
+      } else {
+        log(cv.verdict, `${cv.verdict === 'PASS' ? '🎉 PASSED' : '💀 GAME OVER'} — equity $${cv.cur.toFixed(2)} (confirmed)`);
+        writeFileSync(HALTED, `${new Date().toISOString()} ${cv.verdict} equity=${cv.cur.toFixed(2)}\n`);
+        setRunnerState({ status: cv.verdict, equity: cv.cur, final: true });
+        break;
+      }
     }
     await sleep(TICK_MS);
   }
   log('INFO', '=== runner stopped ===');
-}
-
-function alertLog(msg) {
-  appendFileSync(`${DIR}/alerts.log`, `${new Date().toISOString()} ${msg}\n`);
 }
 
 main().catch((e) => { log('FATAL', e.stack || e.message); process.exit(1); });

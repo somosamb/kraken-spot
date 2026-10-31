@@ -1,15 +1,8 @@
 #!/bin/sh
-cd /home/oc/kraken-spot || exit 1
-# Relaunch runner + watchdog if missing; never places orders.
-if ! pgrep -f "^node runner\.mjs" >/dev/null 2>&1; then
-  setsid nohup node runner.mjs >/dev/null 2>>runner.err < /dev/null &
-  sleep 3
-fi
-if ! pgrep -f "^sh watchdog\.sh" >/dev/null 2>&1; then
-  setsid nohup sh watchdog.sh >/dev/null 2>>runner.err < /dev/null &
-  sleep 2
-fi
-# wait for a real cycle
-sleep 50
+# Post-reboot restore: revive watchdog (which revives the runner), wait for a real
+# cycle, then run consistency checks and unit tests. Never places orders by itself.
+cd "$(dirname "$0")" || exit 1
+sh kspot
+sleep 60
 node validate.mjs
 node tests.mjs

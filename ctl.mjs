@@ -7,16 +7,24 @@
  *   profit target     +12%  -> $1120  = PASS
  *   loss floor         -3%  -> $970   = GAME OVER (static, from start balance)
  *   no daily limit, no time limit
+ *
+ * Environment:
+ *   KS_DIR        working directory for state/logs (default: this file's directory)
+ *   KRAKEN_BIN    kraken CLI binary (default: `kraken` on PATH)
+ *   KS_WORKSPACE  paper workspace name (default: spotbot)
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const KRAKEN = '/home/oc/bin/kraken';
-const WS = 'spotbot';
-export const DIR = '/home/oc/kraken-spot';
+export const KRAKEN = process.env.KRAKEN_BIN || 'kraken';
+export const WS = process.env.KS_WORKSPACE || 'spotbot';
+export const DIR = process.env.KS_DIR || dirname(fileURLToPath(import.meta.url));
 export const STATE = `${DIR}/state.json`;
 export const EQUITY_CSV = `${DIR}/equity.csv`;
 export const TRADES = `${DIR}/trades.jsonl`;
+export const HALTED = `${DIR}/HALTED`;
 
 export const RULES = {
   start: 1000,
@@ -26,18 +34,15 @@ export const RULES = {
   get floor() { return this.start * (1 - this.floorPct / 100); },
 };
 
-export const RISK = {
-  feePerSide: 0.0026,   // spot paper taker fee, 0.26%
-  perTradeRiskPct: 0.0030,
-  maxPosPct: 0.20,
-  maxTotalPct: 0.40,
-  minRR: 2.0,
-};
+export const FEE_PER_SIDE = 0.0026;   // spot paper taker fee, 0.26%
+/** Venue and own valuation must agree within this fraction, else the venue figure is rejected. */
+export const VALUATION_TOLERANCE = 0.01;
+/** Holdings worth less than this are treated as dust. */
+export const DUST_USD = 1;
 
 function parseResult(out) {
   const lines = out.split('\n').map((l) => l.trim()).filter(Boolean);
-  const candidates = [...lines].reverse();
-  for (const c of candidates) {
+  for (const c of [...lines].reverse()) {
     if (!c.startsWith('{') && !c.startsWith('[')) continue;
     try { return JSON.parse(c); } catch { /* keep looking */ }
   }
@@ -45,17 +50,19 @@ function parseResult(out) {
 }
 
 const LOCK_MSG = 'in use by another process';
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+export const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-export function kraken(args, { allowFail = false, retries = 8 } = {}) {
+export function kraken(args, { allowFail = false, retries = 8, workspace = true } = {}) {
   let lastErr = null;
+  const full = workspace ? ['--workspace', WS, ...args] : args;
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) sleepSync(400 + attempt * 350);
     try {
-      const out = execFileSync(KRAKEN, ['--workspace', WS, ...args], {
+      const out = execFileSync(KRAKEN, full, {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: 32 * 1024 * 1024,
+        timeout: 60_000,
       });
       if (!out.trim()) throw new Error('empty response');
       return parseResult(out);
@@ -70,69 +77,116 @@ export function kraken(args, { allowFail = false, retries = 8 } = {}) {
   throw new Error(`kraken ${args.join(' ')} -> lock still held after ${retries + 1} tries: ${lastErr?.slice(0, 200)}`);
 }
 
-// spot paper
+// spot paper (workspace-scoped)
 export const status = () => kraken(['paper', 'status', '-o', 'json']);
 export const balance = () => kraken(['paper', 'balance', '-o', 'json'], { allowFail: true });
 export const paperOrders = () => kraken(['paper', 'orders', '-o', 'json'], { allowFail: true });
 export const paperHistory = () => kraken(['paper', 'history', '-o', 'json'], { allowFail: true });
-// market data (global, no workspace needed but harmless)
-export const ticker = (pair) => {
-  // use global kraken without workspace override for ticker
-  try {
-    const out = execFileSync(KRAKEN, ['ticker', pair, '-o', 'json'], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'], maxBuffer: 32*1024*1024 });
-    return parseResult(out);
-  } catch (e) {
-    throw new Error(`ticker ${pair}: ${(e.stderr||e.message||'').toString().slice(0,200)}`);
-  }
-};
-export const ohlc = (pair, interval = 60) => {
-  const out = execFileSync(KRAKEN, ['ohlc', pair, '--interval', String(interval), '-o', 'json'], { encoding: 'utf8', stdio: ['ignore','pipe','pipe'], maxBuffer: 32*1024*1024 });
-  return parseResult(out);
-};
+// market data (global)
+export const ticker = (...pairs) => kraken(['ticker', ...pairs, '-o', 'json'], { workspace: false, retries: 2 });
+export const ohlc = (pair, interval = 60) => kraken(['ohlc', pair, '--interval', String(interval), '-o', 'json'], { workspace: false, retries: 2 });
 
+// ---- state ------------------------------------------------------------------
 export function loadState() {
   if (!existsSync(STATE)) {
     mkdirSync(DIR, { recursive: true });
-    writeFileSync(STATE, JSON.stringify({
+    saveState({
       createdAt: new Date().toISOString(),
       status: 'RUNNING',
       peak: RULES.start,
       trough: RULES.start,
       positions: {},
       tradeSeq: 0,
-      seenFills: [],
       lastEquity: RULES.start,
-    }, null, 2));
+    });
   }
   return JSON.parse(readFileSync(STATE, 'utf8'));
 }
-export function saveState(s) { writeFileSync(STATE, JSON.stringify(s, null, 2)); }
+/** Atomic write: a crash mid-write can never leave a truncated state.json. */
+export function saveState(s) {
+  const tmp = `${STATE}.tmp`;
+  writeFileSync(tmp, JSON.stringify(s, null, 2));
+  renameSync(tmp, STATE);
+}
+
+// ---- prices -----------------------------------------------------------------
+export function pickPrice(t) {
+  const px = Number(t?.last_price ?? t?.last ?? t?.ask_price ?? t?.bid_price ?? t?.price);
+  return Number.isFinite(px) && px > 0 ? px : null;
+}
+
+export function lastPrice(pair) {
+  const t = ticker(pair);
+  const v = Array.isArray(t) ? t[0] : (t?.[pair] ?? t?.[pair.replace('/', '')] ?? t);
+  const px = pickPrice(v);
+  if (px === null) throw new Error(`bad ticker for ${pair}: ${JSON.stringify(t).slice(0, 200)}`);
+  return px;
+}
+
+/** Prices for several pairs in one CLI call. Missing pairs are simply absent. */
+export function lastPrices(pairs) {
+  if (pairs.length === 0) return {};
+  const t = ticker(...pairs);
+  const out = {};
+  for (const p of pairs) {
+    const px = pickPrice(t?.[p] ?? t?.[p.replace('/', '')]);
+    if (px !== null) out[p] = px;
+  }
+  return out;
+}
+
+/** Non-USD holdings from a `paper balance` response: { 'BTC/USD': {total, reserved, available} }. */
+export function holdingsFrom(bal) {
+  const out = {};
+  for (const [asset, v] of Object.entries(bal?.balances ?? {})) {
+    if (asset === 'USD') continue;
+    const total = Number(v.total);
+    if (!(total > 0)) continue;
+    out[`${asset}/USD`] = { total, reserved: Number(v.reserved) || 0, available: Number(v.available) || 0 };
+  }
+  return out;
+}
+
+/**
+ * Own mark-to-market valuation: USD + sum(holding * last price).
+ * Returns null if any holding cannot be priced (valuation would be incomplete).
+ */
+export function ownValuation(bal, prices) {
+  const usd = Number(bal?.balances?.USD?.total);
+  if (!Number.isFinite(usd)) return null;
+  let total = usd;
+  for (const [pair, h] of Object.entries(holdingsFrom(bal))) {
+    const px = prices[pair];
+    if (!Number.isFinite(px)) return null;
+    total += h.total * px;
+  }
+  return total;
+}
+
+/**
+ * Decide which equity figure to trust. Pure, unit-tested.
+ * The venue figure is rejected when it flags itself incomplete or disagrees with our own valuation.
+ */
+export function chooseEquity(venue, own, tolerance = VALUATION_TOLERANCE) {
+  const v = Number(venue?.current_value ?? venue?.equity);
+  const venueOk = Number.isFinite(v) && venue?.valuation_complete !== false;
+  if (own !== null && Number.isFinite(own)) {
+    if (venueOk && Math.abs(v / own - 1) <= tolerance) return { cur: v, source: 'venue' };
+    return { cur: own, source: 'own', rejected: Number.isFinite(v) ? v : null };
+  }
+  if (venueOk) return { cur: v, source: 'venue-unverified' };
+  throw new Error('equity unavailable: venue valuation incomplete and own valuation failed');
+}
 
 export function equity() {
-  const read = () => {
-    const s = status();
-    return { st: s, v: Number(s.current_value ?? s.equity) };
-  };
-  let { st, v } = read();
-  if (!Number.isFinite(v)) throw new Error('bad equity');
-  // anti-glitch: a jump >5% vs last snapshot is only accepted if a second read confirms it
-  let prev = null;
-  try { prev = Number(JSON.parse(readFileSync(STATE, 'utf8')).lastEquity); } catch { /* first run */ }
-  if (Number.isFinite(prev) && prev > 0 && Math.abs(v / prev - 1) > 0.05) {
-    const s2 = read();
-    if (Number.isFinite(s2.v)) {
-      if (Math.abs(s2.v / prev - 1) <= 0.05) { st = s2.st; v = s2.v; }
-      else if (Math.abs(s2.v / v - 1) <= 0.01) { v = (v + s2.v) / 2; st = s2.st; }
-      else {
-        const s3 = read();
-        const vals = [v, s2.v, s3.v].filter(Number.isFinite).sort((a, b) => a - b);
-        v = vals[Math.floor(vals.length / 2)];
-        st = s3.st;
-      }
-    }
+  const st = status();
+  const bal = balance();
+  let own = null;
+  if (bal) {
+    try { own = ownValuation(bal, lastPrices(Object.keys(holdingsFrom(bal)))); } catch { own = null; }
   }
-  if (!Number.isFinite(v)) throw new Error('bad equity');
-  return { cur: v, st };
+  const c = chooseEquity(st, own);
+  return { ...c, st, bal };
 }
 
 export function verdict(cur) {
@@ -141,8 +195,23 @@ export function verdict(cur) {
   return 'RUNNING';
 }
 
+/**
+ * A terminal verdict (PASS/BUST) liquidates and halts the bot, so it must survive a
+ * second independent read a few seconds later. Otherwise the reading is treated as a glitch.
+ */
+export function confirmedVerdict(first, delayMs = 5000) {
+  const v1 = verdict(first.cur);
+  if (v1 === 'RUNNING') return { verdict: v1, cur: first.cur };
+  sleepSync(delayMs);
+  const second = equity();
+  const v2 = verdict(second.cur);
+  if (v2 === v1) return { verdict: v1, cur: second.cur, confirmed: true };
+  return { verdict: 'RUNNING', cur: second.cur, glitch: { first: first.cur, second: second.cur } };
+}
+
 export function snapshot(note = '') {
-  const { cur, st } = equity();
+  const e = equity();
+  const { cur } = e;
   const s = loadState();
   s.peak = Math.max(s.peak, cur);
   s.trough = Math.min(s.trough, cur);
@@ -151,122 +220,67 @@ export function snapshot(note = '') {
   saveState(s);
 
   if (!existsSync(EQUITY_CSV)) {
-    appendFileSync(EQUITY_CSV, 'ts,equity,pnl_pct,progress_to_target,unrealized,note\n');
+    appendFileSync(EQUITY_CSV, 'ts,equity,pnl_pct,progress_to_target,source,note\n');
   }
-  const unreal = Object.keys(loadState().positions ?? {}).length === 0 ? 0 : Number(st.unrealized_pnl ?? 0);
   const pnl = ((cur - RULES.start) / RULES.start) * 100;
   const progress = ((cur - RULES.start) / (RULES.target - RULES.start)) * 100;
   appendFileSync(EQUITY_CSV,
-    `${new Date().toISOString()},${cur.toFixed(2)},${pnl.toFixed(3)},${progress.toFixed(2)},${unreal.toFixed(2)},"${note.replace(/"/g, "'")}"\n`);
-  return { cur, pnl, progress, status: s.status };
-}
-
-export function guard() {
-  const { cur } = equity();
-  const v = verdict(cur);
-  return { equity: cur, verdict: v, target: RULES.target, floor: RULES.floor };
-}
-
-export const round = (n, d) => Math.floor(n * 10 ** d) / 10 ** d;
-
-export function sizeFor(pair, price, stopPct, equityUsd, notionalPct = RISK.maxPosPct, riskPct = RISK.perTradeRiskPct) {
-  const riskUsd = equityUsd * riskPct;
-  const stopDist = price * (stopPct / 100);
-  let vol = riskUsd / stopDist;
-  const maxNotional = equityUsd * notionalPct;
-  if (vol * price > maxNotional) vol = maxNotional / price;
-
-  const lotDecimals = 8;
-  vol = round(vol, lotDecimals);
-  const orderMin = { 'BTC/USD': 0.00005, 'ETH/USD': 0.001, 'SOL/USD': 0.06 }[pair] ?? 0.0001;
-  const costMin = 0.5;
-  if (vol < orderMin) vol = orderMin;
-  let notional = vol * price;
-  if (notional < costMin) {
-    vol = round(costMin / price, lotDecimals);
-    if (vol < orderMin) vol = orderMin;
-    notional = vol * price;
-  }
-  const effStopPct = Math.min(stopPct, (riskUsd / notional) * 100);
-  const effRisk = notional * (effStopPct / 100);
-  return { vol, notional, riskUsd: effRisk, budgetedRisk: riskUsd, capped: notional < riskUsd / (stopPct / 100) - 1e-9 };
-}
-
-export function rrAfterFees(stopPct, targetPct) {
-  const feeCostPct = 2 * RISK.feePerSide * 100; // 0.52%
-  const netWin = targetPct - feeCostPct;
-  const netLoss = stopPct + feeCostPct;
-  return { netWin, netLoss, rr: netWin / netLoss };
-}
-
-export function lastPrice(pair) {
-  const t = ticker(pair);
-  // ticker may return object keyed by pair or array
-  let v;
-  if (Array.isArray(t)) v = t[0];
-  else if (t && t[pair]) v = t[pair];
-  else v = t;
-  const px = Number(v?.last_price ?? v?.last ?? v?.ask_price ?? v?.bid_price ?? v?.price);
-  if (!Number.isFinite(px) || px <= 0) throw new Error(`bad ticker for ${pair}: ${JSON.stringify(t).slice(0,200)}`);
-  return px;
+    `${new Date().toISOString()},${cur.toFixed(2)},${pnl.toFixed(3)},${progress.toFixed(2)},${e.source},"${note.replace(/"/g, "'")}"\n`);
+  return { cur, pnl, progress, status: s.status, source: e.source, rejected: e.rejected ?? null, equity: e };
 }
 
 const f = (n, d = 2) => Number(n).toFixed(d);
 
 export function report() {
-  const { cur, st } = equity();
+  const e = equity();
+  const { cur, bal } = e;
   const s = loadState();
   const v = verdict(cur);
   const pnl = ((cur - RULES.start) / RULES.start) * 100;
   const progress = ((cur - RULES.start) / (RULES.target - RULES.start)) * 100;
   const distFloor = ((cur - RULES.floor) / RULES.start) * 100;
   const distTarget = ((RULES.target - cur) / RULES.start) * 100;
-  const bal = balance();
   const open = paperOrders() ?? {};
   const openOrders = open.open_orders ?? open.orders ?? [];
+  const halted = existsSync(HALTED);
 
   const bar = (pct, w = 26) => {
     const n = Math.max(0, Math.min(w, Math.round((pct / 100) * w)));
     return '█'.repeat(n) + '░'.repeat(w - n);
   };
+  const tag = halted ? 'HALTED (see HALTED file)' : v === 'PASS' ? '🎉 TARGET REACHED' : v === 'BUST' ? '💀 FLOOR BREACHED' : 'in play';
+  const row = (t) => `│ ${t}`.padEnd(56) + '│';
 
   const lines = [
     `┌──────────────── KRAKEN SPOT PAPER ────────────────┐`,
-    `│ status   ${v.padEnd(10)} ${v === 'PASS' ? '🎉 TARGET REACHED' : v === 'BUST' ? '💀 FLOOR BREACHED' : 'in play'}  `.padEnd(56) + `│`,
-    `│ equity   $${f(cur)}   start $${f(RULES.start)}   P&L ${pnl >= 0 ? '+' : ''}${f(pnl)}%  `.padEnd(56) + `│`,
-    `│ target   $${f(RULES.target)} (+12%)   floor $${f(RULES.floor)} (-3%)  `.padEnd(56) + `│`,
-    `│ progress ${bar(progress)} ${f(progress, 1)}%  `.padEnd(56) + `│`,
-    `│ runway   ${f(distTarget)}% to PASS  |  ${f(distFloor)}% to BUST  `.padEnd(56) + `│`,
-    `│ peak     $${f(s.peak)}   trough $${f(s.trough)}   unrealized ${f(Object.keys(s.positions ?? {}).length === 0 ? 0 : Number(st.unrealized_pnl ?? 0))}  `.padEnd(56) + `│`,
-    `│ cash     $${f(Number(bal?.balances?.USD?.available ?? bal?.available ?? 0))}   positions ${Object.keys(s.positions).length}   openOrders ${openOrders.length}  `.padEnd(56) + `│`,
+    row(`status   ${v.padEnd(10)} ${tag}`),
+    row(`equity   $${f(cur)}   start $${f(RULES.start)}   P&L ${pnl >= 0 ? '+' : ''}${f(pnl)}%`),
+    row(`target   $${f(RULES.target)} (+${RULES.targetPct}%)   floor $${f(RULES.floor)} (-${RULES.floorPct}%)`),
+    row(`progress ${bar(progress)} ${f(progress, 1)}%`),
+    row(`runway   ${f(distTarget)}% to PASS  |  ${f(distFloor)}% to BUST`),
+    row(`peak     $${f(s.peak)}   trough $${f(s.trough)}   src ${e.source}`),
+    row(`cash     $${f(Number(bal?.balances?.USD?.available ?? 0))}   positions ${Object.keys(s.positions).length}   openOrders ${openOrders.length}`),
     `└──────────────────────────────────────────────────┘`,
   ];
-  return { text: lines.join('\n'), cur, verdict: v, progress, pnl, state: s };
+  return { text: lines.join('\n'), cur, verdict: v, progress, pnl, state: s, source: e.source, halted };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [cmd, ...rest] = process.argv.slice(2);
   try {
     if (cmd === 'status' || !cmd) {
-      const r = report();
-      console.log(r.text);
+      console.log(report().text);
     } else if (cmd === 'json') {
       const r = report();
-      console.log(JSON.stringify({ equity: r.cur, verdict: r.verdict, progress: r.progress, pnl: r.pnl, state: r.state }));
+      console.log(JSON.stringify({ equity: r.cur, verdict: r.verdict, progress: r.progress, pnl: r.pnl, source: r.source, halted: r.halted, state: r.state }));
     } else if (cmd === 'snapshot') {
-      const note = rest.join(' ');
-      const r = snapshot(note);
-      console.log(JSON.stringify(r));
+      const r = snapshot(rest.join(' '));
+      console.log(JSON.stringify({ cur: r.cur, pnl: r.pnl, progress: r.progress, status: r.status, source: r.source }));
     } else if (cmd === 'guard') {
-      const g = guard();
-      console.log(JSON.stringify(g));
-      if (g.verdict === 'BUST') process.exitCode = 2;
-    } else if (cmd === 'size') {
-      const [pair, stopPct] = rest;
-      const { cur } = equity();
-      const px = lastPrice(pair);
-      const s = sizeFor(pair, px, Number(stopPct), cur);
-      console.log(JSON.stringify({ pair, price: px, ...s, rr: rrAfterFees(Number(stopPct), Number(rest[2] ?? 4)) }));
+      const e = equity();
+      const c = confirmedVerdict(e);
+      console.log(JSON.stringify({ equity: c.cur, verdict: c.verdict, source: e.source, target: RULES.target, floor: RULES.floor }));
+      if (c.verdict === 'BUST') process.exitCode = 2;
     } else {
       console.error(`unknown command: ${cmd}`);
       process.exitCode = 1;

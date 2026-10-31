@@ -1,5 +1,10 @@
 # Plan: Trader + Watchdog local para Kraken Spot Paper
 
+> **Nota histórica.** Documento de diseño original (2026-10-18), anterior a la
+> implementación. Varios parámetros y decisiones cambiaron después (K=1.25,
+> TARGET_ATR=0.75, HOLD_MAX_DAYS=10, MAX_CONCURRENT=2, reconciliación, HALTED…).
+> La referencia actual es el `README.md` y el `CHANGELOG.md` en la raíz.
+
 Diseño de un sistema autónomo para operar un workspace de **Kraken Spot Paper**
 usando `kraken-cli` v0.4.1, análogo al sistema futures de `/home/oc/challenge` pero
 adaptado a las limitaciones reales del spot paper.

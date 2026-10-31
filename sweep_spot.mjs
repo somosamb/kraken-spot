@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { simulate } from './backtest.mjs';
-const DIR = '/home/oc/kraken-spot';
+const DIR = process.env.KS_DIR || new URL('.', import.meta.url).pathname.replace(/\/$/, '');
 const hist = JSON.parse(readFileSync(`${DIR}/hist.spot.1d.json`, 'utf8'));
 const UNIVERSE = Object.keys(hist);
 const N = hist[UNIVERSE[0]].length;

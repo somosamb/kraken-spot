@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-const DIR = '/home/oc/kraken-spot';
-const KRAKEN = '/home/oc/bin/kraken';
+const DIR = process.env.KS_DIR || new URL('.', import.meta.url).pathname.replace(/\/$/, '');
+const KRAKEN = process.env.KRAKEN_BIN || 'kraken';
 const universe = JSON.parse(readFileSync(`${DIR}/universe.json`, 'utf8'));
 const pairs = universe.selected.map(s => s.pair);
 const hist = {};

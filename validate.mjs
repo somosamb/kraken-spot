@@ -1,89 +1,83 @@
 #!/usr/bin/env node
+/**
+ * Live consistency check: code parses, processes are single, local state matches the
+ * exchange (positions, take-profits), equity sources agree. Exit 0 = consistent.
+ */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import {
+  DIR, HALTED, RULES, status, balance, paperOrders, holdingsFrom, lastPrices, ownValuation,
+  chooseEquity, loadState,
+} from './ctl.mjs';
+import { diffPositions } from './trader.mjs';
 
-const DIR = '/home/oc/kraken-spot';
-const KRAKEN = '/home/oc/bin/kraken';
-const WS = 'spotbot';
-let pass = 0, fail = 0;
+let pass = 0, fail = 0, warn = 0;
 const ok = (n, d = '') => { pass++; console.log(`  PASS  ${n}${d ? '  ' + d : ''}`); };
 const bad = (n, d = '') => { fail++; console.log(`  FAIL  ${n}${d ? '  ' + d : ''}`); };
+const note = (n, d = '') => { warn++; console.log(`  WARN  ${n}${d ? '  ' + d : ''}`); };
 const chk = (c, n, d = '') => (c ? ok(n, d) : bad(n, d));
-
-const LOCK_HINT = 'in use by another process';
-const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-const cli = (args, tries = 12) => {
-  for (let i = 0; i < tries; i++) {
-    if (i) sleepSync(5000);
-    try {
-      return JSON.parse(execFileSync(KRAKEN, ['--workspace', WS, ...args]).toString().trim().split('\n').pop());
-    } catch (e) {
-      const msg = String(e.stdout ?? '') + String(e.stderr ?? '') + String(e.message ?? '');
-      if (!msg.includes(LOCK_HINT)) throw e;
-    }
-  }
-  console.log('\nCANNOT VALIDATE: paper state lock held');
-  process.exit(2);
-};
 
 console.log(`\n=== VALIDATION  ${new Date().toISOString()} ===\n`);
 
 console.log('[1] code parses');
-for (const f of ['ctl.mjs', 'spot.mjs', 'trader.mjs', 'runner.mjs', 'riskpolicy.mjs', 'validate.mjs']) {
-  try { execFileSync('node', ['--check', `${DIR}/${f}`]); ok(`${f} parses`); }
+for (const f of ['ctl.mjs', 'spot.mjs', 'trader.mjs', 'runner.mjs', 'riskpolicy.mjs', 'validate.mjs', 'tests.mjs']) {
+  try { execFileSync(process.execPath, ['--check', `${DIR}/${f}`]); ok(`${f} parses`); }
   catch (e) { bad(`${f} parses`, e.message.slice(0, 80)); }
 }
-try { execFileSync('sh', ['-n', `${DIR}/watchdog.sh`]); ok('watchdog.sh parses'); }
-catch (e) { bad('watchdog.sh parses', e.message.slice(0, 80)); }
-
-console.log('\n[2] constants');
-const trader = readFileSync(`${DIR}/trader.mjs`, 'utf8');
-const KV = (k) => Number((trader.match(new RegExp(`const ${k} = ([\\d.]+);`, 'm')) ?? [])[1]);
-chk(KV('K') === 1.25, 'K = 1.25');
-chk(KV('MIN_TARGET_PCT') === 1.6, 'MIN_TARGET_PCT = 1.6');
-chk(KV('TARGET_ATR') === 0.75, 'TARGET_ATR = 0.75');
-chk(/price > e200/.test(trader), 'per-pair EMA200 uptrend filter');
-chk(/FREEZE_MIN_TRADES = 15/.test(trader) && /FREEZE_WINRATE = 0\.55/.test(trader), 'freeze 15 trades / 55% with auto-clear');
-chk(/export function marketRegime/.test(trader), 'BTC market regime filter');
-chk(/ohlc\.1d\.cache\.json/.test(trader) && /entry\.ts >= todayStart/.test(trader), 'daily OHLC disk cache (1 refresh/day)');
-chk(/export async function prewarm/.test(trader), 'parallel prewarm (bounded concurrency)');
-chk(/never cancel a live take-profit/.test(trader), 'stale-order sweep protects live TPs');
-chk(/paper', 'cancel', String\(orderId\)/.test(readFileSync(`${DIR}/spot.mjs`, 'utf8')), 'cancel uses positional order id');
-chk(KV('STOP_ATR') === 1.5, 'STOP_ATR = 1.5');
-chk(/entryPx - STOP_ATR \* sig\.atr/.test(trader), 'stop/target re-anchored to fill price');
-chk(KV('HOLD_MAX_DAYS') === 10, 'HOLD_MAX_DAYS = 10');
-chk(/ohlc\(pair, 1440\)/.test(trader), 'signals on daily bars (1440)');
-chk(/CYCLE_TIMEOUT_MS = 600_000/.test(readFileSync(`${DIR}/runner.mjs`, 'utf8')), 'cycle timeout 600s');
-chk(KV('MAX_CONCURRENT') === 2, 'MAX_CONCURRENT = 2');
-chk(KV('CORR_MAX') === 0.65, 'CORR_MAX = 0.65');
-
-console.log('\n[3] processes');
-const ps = execFileSync('ps', ['-eo', 'pid,args']).toString();
-const runnerLines = ps.split('\n').filter((l) => /^\s*\d+\s+(?:[\w./-]*\/)?node runner\.mjs\s*$/.test(l));
-const wdLines = ps.split('\n').filter((l) => /^\s*\d+\s+(?:[\w./-]*\/)?sh watchdog\.sh\s*$/.test(l));
-chk(runnerLines.length <= 1, 'at most one runner', runnerLines.length);
-chk(wdLines.length <= 1, 'at most one watchdog', wdLines.length);
-
-console.log('\n[4] exchange state');
-const st = cli(['paper', 'status', '-o', 'json']);
-const eq = Number(st.current_value);
-chk(Number.isFinite(eq), 'equity readable', String(eq));
-chk(eq > 970, 'equity above floor', `cushion $${(eq - 970).toFixed(2)}`);
-
-console.log('\n[5] local state');
-const state = existsSync(`${DIR}/state.json`) ? JSON.parse(readFileSync(`${DIR}/state.json`, 'utf8')) : null;
-chk(!!state, 'state.json exists');
-if (state) {
-  chk(typeof state.positions === 'object', 'positions object');
-  const localSyms = Object.keys(state.positions);
-  chk(localSyms.length <= 2, 'positions <= MAX_CONCURRENT', String(localSyms.length));
+for (const f of ['watchdog.sh', 'kspot', 'resume.sh', 'killprocs.sh']) {
+  try { execFileSync('sh', ['-n', `${DIR}/${f}`]); ok(`${f} parses`); }
+  catch (e) { bad(`${f} parses`, e.message.slice(0, 80)); }
 }
 
-console.log('\n[6] ledger');
-const hist = cli(['paper', 'history', '-o', 'json']);
-const trades = hist.trades ?? [];
-console.log(`  info  ${trades.length} closed trades`);
+console.log('\n[2] processes');
+const count = (re) => {
+  try { return Number(execFileSync('pgrep', ['-fc', re]).toString().trim()); } catch { return 0; }
+};
+const runners = count('^node runner\\.mjs');
+const watchdogs = count('^(/bin/)?sh (\\./)?watchdog\\.sh$');
+const halted = existsSync(HALTED);
+chk(runners <= 1, 'at most one runner', String(runners));
+chk(watchdogs <= 1, 'at most one watchdog', String(watchdogs));
+if (halted) note('HALTED present', readFileSync(HALTED, 'utf8').trim());
+else {
+  chk(runners === 1, 'runner alive');
+  chk(watchdogs === 1, 'watchdog alive');
+}
+if (existsSync(`${DIR}/FAILURE_SENTINEL`)) note('FAILURE_SENTINEL present', readFileSync(`${DIR}/FAILURE_SENTINEL`, 'utf8').trim());
 
-console.log(`\n=== ${pass} passed, ${fail} failed ===`);
+console.log('\n[3] equity');
+const st = status();
+const bal = balance();
+chk(!!bal, 'balance readable');
+const holdings = holdingsFrom(bal);
+const prices = lastPrices([...new Set([...Object.keys(holdings), ...Object.keys(loadState().positions)])]);
+const own = ownValuation(bal, prices);
+const eq = chooseEquity(st, own);
+chk(st.valuation_complete !== false, 'venue valuation complete');
+chk(eq.source === 'venue', 'venue and own valuation agree', `venue=${Number(st.current_value).toFixed(2)} own=${own?.toFixed(2)}`);
+chk(eq.cur > RULES.floor, 'equity above floor', `cushion $${(eq.cur - RULES.floor).toFixed(2)}`);
+
+console.log('\n[4] state vs exchange');
+const state = loadState();
+const d = diffPositions(state.positions, holdings, prices);
+chk(d.orphans.length === 0, 'no untracked holdings', d.orphans.map(o => `${o.pair}:${o.qty}`).join(' '));
+chk(d.gone.length === 0, 'no tracked positions missing on exchange', d.gone.join(' '));
+chk(d.resized.length === 0, 'tracked sizes match holdings', d.resized.map(o => `${o.pair}:${o.qty}`).join(' '));
+chk(Object.keys(state.positions).length <= 2, 'positions <= MAX_CONCURRENT');
+const oo = paperOrders();
+const openIds = new Set((oo?.open_orders ?? oo?.orders ?? []).map(o => o.id ?? o.order_id));
+for (const [pair, p] of Object.entries(state.positions)) {
+  chk(p.tpOrderId && openIds.has(p.tpOrderId), `${pair} take-profit resting`, String(p.tpOrderId));
+  chk(p.stopPx < p.entry && p.tpPx > p.entry, `${pair} stop < entry < tp`);
+}
+chk(!existsSync(`${DIR}/state.json.tmp`), 'no leftover state.json.tmp');
+
+console.log('\n[5] ledger');
+const recs = existsSync(`${DIR}/trades.jsonl`)
+  ? readFileSync(`${DIR}/trades.jsonl`, 'utf8').trim().split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
+const keys = recs.map(r => `${r.symbol}|${r.openedAt}`);
+chk(new Set(keys).size === keys.length, 'no duplicate trades in ledger', `${recs.length} trades`);
+
+console.log(`\n=== ${pass} passed, ${fail} failed, ${warn} warnings ===`);
 console.log(fail === 0 ? 'SYSTEM CONSISTENT' : 'INCONSISTENCIES FOUND');
 process.exit(fail === 0 ? 0 : 1);

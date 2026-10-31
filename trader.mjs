@@ -1,19 +1,25 @@
 #!/usr/bin/env node
 /**
  * One trading cycle for Kraken Spot Paper.
- * Modes: `node trader.mjs loop` (manage + entry) | `node trader.mjs loop noentry`
+ * Modes: `node trader.mjs loop` (reconcile + manage + entry) | `node trader.mjs loop noentry`
+ *
+ * Crash-safety contract: every exchange mutation (buy, sell, TP placement) is followed by
+ * an immediate saveState(), and every cycle starts by reconciling state.json against the
+ * real balances, so a cycle killed at any point can never leave an untracked position or
+ * cause a duplicate buy.
  */
-import { status, equity, verdict, loadState, saveState, RULES, ticker, ohlc, lastPrice, paperOrders } from './ctl.mjs';
-import { buy, sell, limitSell, cancel, cancelAll } from './spot.mjs';
-import { riskFor, budgetFor } from './riskpolicy.mjs';
+import {
+  DIR, KRAKEN, equity, verdict, confirmedVerdict, loadState, saveState, ohlc, lastPrice,
+  lastPrices, paperOrders, paperHistory, balance, holdingsFrom, FEE_PER_SIDE, DUST_USD, HALTED,
+} from './ctl.mjs';
+import { buy, sell, limitSell, cancel, cancelPair } from './spot.mjs';
+import { budgetFor } from './riskpolicy.mjs';
 import { appendFileSync, writeFileSync, readFileSync, existsSync, unlinkSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execFileP = promisify(execFile);
-const KRAKEN_CLI = '/home/oc/bin/kraken';
 
-const DIR = '/home/oc/kraken-spot';
 const LOG = `${DIR}/bot.log`;
 const ALERTS = `${DIR}/alerts.log`;
 const TRADES = `${DIR}/trades.jsonl`;
@@ -29,11 +35,12 @@ const HOLD_MAX_DAYS = 10;
 const STOP_ATR = 1.5;
 const TARGET_ATR = 0.75;
 const MIN_BARS = 220;           // EMA200 + 20 bars for its slope
+const MAX_NOTIONAL_PCT = 0.20;  // per-position notional cap (fraction of equity)
+const MIN_ORDER_USD = 0.5;
 const PROTECT = process.env.FBOT_PROTECT || 'off';
-const ENTRY_ENABLED_DEFAULT = true;
 const REPORT_EVERY = 5;
 const FREEZE_FILE = `${DIR}/FROZEN`;
-const FREEZE_MIN_TRADES = 15;   // qoder 2026-10-28: needs a real sample before halting
+const FREEZE_MIN_TRADES = 15;   // needs a real sample before halting
 const FREEZE_WINRATE = 0.55;
 
 const UNIVERSE = ['BTC/USD','ETH/USD','SOL/USD','XRP/USD','ADA/USD','DOGE/USD','LINK/USD','AVAX/USD','DOT/USD','LTC/USD','BCH/USD','UNI/USD','ATOM/USD','NEAR/USD','APT/USD','ARB/USD','OP/USD','SUI/USD','INJ/USD','TIA/USD','TRX/USD','XLM/USD','ETC/USD','FIL/USD'];
@@ -42,8 +49,11 @@ function logLine(msg) { appendFileSync(LOG, `${new Date().toISOString()} ${msg}\
 function alert(msg) {
   const line = `${new Date().toISOString()} [ALERT] ${msg}`;
   appendFileSync(ALERTS, line + '\n');
-  console.log(line);
+  logLine(`[ALERT] ${msg}`);
 }
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+const norm = (p) => String(p ?? '').replace('/', '');
+const floor8 = (n) => Math.floor(n * 1e8) / 1e8;
 
 // ---- math helpers ---------------------------------------------------------
 function ema(values, period) {
@@ -79,39 +89,6 @@ function pearson(a, b) {
   return den === 0 ? 0 : num/den;
 }
 
-// ---- correlation cache ----------------------------------------------------
-const corrCache = new Map();
-function closesFor(pair) {
-  try { return dailyBars(pair).map(b => b.close); } catch { return []; }
-}
-export function corrWith(pairA, pairB) {
-  const key = [pairA, pairB].sort().join('|');
-  if (corrCache.has(key)) return corrCache.get(key);
-  const a = closesFor(pairA), b = closesFor(pairB);
-  // use returns
-  const ra = a.slice(1).map((v,i)=> (v-a[i])/a[i]);
-  const rb = b.slice(1).map((v,i)=> (v-b[i])/b[i]);
-  const c = pearson(ra, rb);
-  corrCache.set(key, c);
-  return c;
-}
-
-// ---- market regime (qoder 2026-10-28) -------------------------------------
-export function marketRegime() {
-  if (globalThis.__TEST_MARKET__) return globalThis.__TEST_MARKET__;
-  let bars;
-  try { bars = dailyBars('BTC/USD'); }
-  catch { return { ok: false, reason: 'network' }; }
-  if (bars.length < MIN_BARS) return { ok: false, reason: 'insufficient_bars' };
-  const closes = bars.map(b => b.close);
-  const e200 = ema(closes, 200);
-  const close = closes.at(-1);
-  const now = e200.at(-1);
-  const then = e200[e200.length - 21];
-  const rising = now > then;
-  return { ok: close > now && rising, close, ema200: now, rising };
-}
-
 // ---- daily candles with on-disk cache --------------------------------------
 // The last *completed* daily candle only changes at 00:00 UTC, so caching it is
 // safe: signals are deterministic intraday. A failed fetch falls back to stale.
@@ -128,11 +105,11 @@ function flushBarsCache() {
 process.on('exit', flushBarsCache);
 
 function dailyBars(pair) {
+  if (globalThis.__TEST_BARS__?.[pair]) return globalThis.__TEST_BARS__[pair];
   if (process.env.KS_NO_CACHE === '1') return fetchBars(pair);
   const now = Date.now();
   const cache = loadBarsCache();
   const entry = cache[pair];
-  // signals are deterministic within a UTC day: one refresh per day is enough
   const todayStart = Math.floor(now / DAY_MS) * DAY_MS;
   if (entry?.bars?.length && entry.ts >= todayStart) return entry.bars;
   try {
@@ -145,11 +122,11 @@ function dailyBars(pair) {
   return entry?.bars ?? [];
 }
 
-function fetchBars(pair) {
-  const r = ohlc(pair, 1440);
+function barsFrom(r) {
   const raw = (r.candles ?? r.ohlc ?? []).filter(c => Number(c.time) < Number(r.last));
   return raw.map(c => ({ time:+c.time, open:+c.open, high:+c.high, low:+c.low, close:+c.close }));
 }
+function fetchBars(pair) { return barsFrom(ohlc(pair, 1440)); }
 
 function parseCli(out) {
   const lines = out.split('\n').map(l => l.trim()).filter(Boolean);
@@ -159,16 +136,10 @@ function parseCli(out) {
   }
   throw new Error('no JSON in response');
 }
-
 async function fetchBarsAsync(pair) {
-  const { stdout } = await execFileP(KRAKEN_CLI, ['ohlc', pair, '--interval', '1440', '-o', 'json'],
+  const { stdout } = await execFileP(KRAKEN, ['ohlc', pair, '--interval', '1440', '-o', 'json'],
     { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, timeout: 30_000 });
-  return parseBarsStdout(stdout);
-}
-function parseBarsStdout(stdout) {
-  const r = parseCli(stdout);
-  const raw = (r.candles ?? r.ohlc ?? []).filter(c => Number(c.time) < Number(r.last));
-  return raw.map(c => ({ time:+c.time, open:+c.open, high:+c.high, low:+c.low, close:+c.close }));
+  return barsFrom(parseCli(stdout));
 }
 
 // Cold start: one daily refresh, fetched with bounded concurrency.
@@ -197,15 +168,41 @@ export async function prewarm(concurrency = 5) {
   return { fetched, failed, total: todo.length };
 }
 
+// ---- correlation ----------------------------------------------------------
+const corrCache = new Map();
+function closesFor(pair) {
+  try { return dailyBars(pair).map(b => b.close); } catch { return []; }
+}
+export function corrWith(pairA, pairB) {
+  const key = [pairA, pairB].sort().join('|');
+  if (corrCache.has(key)) return corrCache.get(key);
+  const a = closesFor(pairA), b = closesFor(pairB);
+  const ra = a.slice(1).map((v,i)=> (v-a[i])/a[i]);
+  const rb = b.slice(1).map((v,i)=> (v-b[i])/b[i]);
+  const c = pearson(ra, rb);
+  corrCache.set(key, c);
+  return c;
+}
+
+// ---- market regime --------------------------------------------------------
+export function marketRegime() {
+  if (globalThis.__TEST_MARKET__) return globalThis.__TEST_MARKET__;
+  let bars;
+  try { bars = dailyBars('BTC/USD'); }
+  catch { return { ok: false, reason: 'network' }; }
+  if (bars.length < MIN_BARS) return { ok: false, reason: 'insufficient_bars' };
+  const closes = bars.map(b => b.close);
+  const e200 = ema(closes, 200);
+  const close = closes.at(-1);
+  const now = e200.at(-1);
+  const then = e200[e200.length - 21];
+  const rising = now > then;
+  return { ok: close > now && rising, close, ema200: now, rising };
+}
+
 // ---- signal ---------------------------------------------------------------
 export function analyse(pair) {
-  // test hook
-  let bars;
-  if (globalThis.__TEST_BARS__ && globalThis.__TEST_BARS__[pair]) {
-    bars = globalThis.__TEST_BARS__[pair];
-  } else {
-    bars = dailyBars(pair); // daily bars — matches the 2026-10-25 sweep geometry
-  }
+  const bars = dailyBars(pair); // daily bars — matches the 2026-10-25 sweep geometry
   if (bars.length < MIN_BARS) return null;
   const closes = bars.map(b => b.close);
   const a = atr(bars, 14);
@@ -213,34 +210,35 @@ export function analyse(pair) {
   const e20 = ema(closes, 20).at(-1);
   const e200 = ema(closes, 200).at(-1);
   const price = closes.at(-1);
-  if (!(price > e200)) return null;    // pair must be in an uptrend (qoder 2026-10-28)
-  // spot long: buy the dip (price stretched below EMA)
-  const extDown = (e20 - price) / a;   // positive when price below EMA
-  const extUp = (price - e20) / a;     // positive when price above EMA
-  // candidate long on oversold dip
+  if (!(price > e200)) return null;    // pair must be in an uptrend
+  const extDown = (e20 - price) / a;   // positive when price below EMA20
   if (extDown < K) return null;
   const stopDist = STOP_ATR * a;
-  const targetDist = TARGET_ATR * a;         // high win-rate target (sweep 2026-10-28)
-  const stopPx = price - stopDist;
-  const tpPx = price + targetDist;
+  const targetDist = TARGET_ATR * a;
   return {
-    side: 'long',
-    pair,
-    price,
-    ext: extDown,
-    stopPx,
-    tpPx,
-    atr: a,
+    side: 'long', pair, price, ext: extDown, atr: a,
+    stopPx: price - stopDist,
+    tpPx: price + targetDist,
     stopPct: (stopDist / price) * 100,
     targetPct: (targetDist / price) * 100,
   };
 }
 
-// ---- manage ---------------------------------------------------------------
+// ---- ledger ---------------------------------------------------------------
+function readLedger() {
+  if (!existsSync(TRADES)) return [];
+  return readFileSync(TRADES, 'utf8').trim().split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+}
+/** Dedupe key: a position is identified by symbol + openedAt, so a re-run can never double-book it. */
+export const tradeKey = (symbol, openedAt) => `${symbol}|${openedAt}`;
+export function ledgerHas(recs, symbol, openedAt) {
+  const k = tradeKey(symbol, openedAt);
+  return recs.some(r => tradeKey(r.symbol, r.openedAt) === k);
+}
+
 function reportStats() {
-  if (!existsSync(TRADES)) return;
-  const lines = readFileSync(TRADES, 'utf8').trim().split('\n').filter(Boolean);
-  const recs = lines.map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const recs = readLedger();
   if (recs.length === 0) return;
   const wins = recs.filter(r => r.net >= 0);
   const losses = recs.filter(r => r.net < 0);
@@ -248,100 +246,189 @@ function reportStats() {
   const grossWin = wins.reduce((s, r) => s + r.net, 0);
   const grossLoss = Math.abs(losses.reduce((s, r) => s + r.net, 0));
   const pf = grossLoss > 0 ? grossWin / grossLoss : Infinity;
-  // cumulative drawdown
   let cum = 0, peak = 0, maxDD = 0;
-  for (const r of recs) { cum += r.net; if (cum > peak) peak = cum; const dd = peak - cum; if (dd > maxDD) maxDD = dd; }
-  const msg = `STATS trades=${recs.length} wins=${wins.length} losses=${losses.length} win%=${(wins.length/recs.length*100).toFixed(1)} totalNet=${totalNet.toFixed(2)} avgWin=${wins.length? (grossWin/wins.length).toFixed(2):0} avgLoss=${losses.length? (grossLoss/losses.length).toFixed(2):0} PF=${Number.isFinite(pf)?pf.toFixed(2):'inf'} maxDD=${maxDD.toFixed(2)}`;
-  logLine(msg);
-  alert(msg);
+  for (const r of recs) { cum += r.net; if (cum > peak) peak = cum; maxDD = Math.max(maxDD, peak - cum); }
+  alert(`STATS trades=${recs.length} wins=${wins.length} losses=${losses.length} win%=${(wins.length/recs.length*100).toFixed(1)} totalNet=${totalNet.toFixed(2)} avgWin=${wins.length? (grossWin/wins.length).toFixed(2):0} avgLoss=${losses.length? (grossLoss/losses.length).toFixed(2):0} PF=${Number.isFinite(pf)?pf.toFixed(2):'inf'} maxDD=${maxDD.toFixed(2)}`);
 }
 
-function closePosition(state, sym, pos, price, reason) {
-  const size = pos.size;
-  // free reserved balance: cancel TP resting (and any stale orders on the symbol)
-  if (pos.tpOrderId) { try { cancel(pos.tpOrderId); } catch {} }
-  try { /* cancel any remaining orders on this symbol */ } catch {}
-  // small delay to let the cancel settle in the journal
-  const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-  sleepSync(800);
-  // if balance still reserved, cancel-all as a last resort
-  let r;
-  try { r = sell(sym, size); }
-  catch (e) {
-    try { cancelAll(); sleepSync(800); } catch {}
-    r = sell(sym, size);
-  }
-  const exitPx = r.price || price;
-  const fees = (pos.entry * size * 0.0026) + (exitPx * size * 0.0026);
-  const gross = (exitPx - pos.entry) * size;
+/** Append a closed trade (idempotent) and drop the position from state. Caller saves state. */
+function bookClose(state, sym, pos, { exit, size, exitFee, reason }) {
+  const entryFee = Number.isFinite(pos.entryFee) ? pos.entryFee * (size / pos.size) : pos.entry * size * FEE_PER_SIDE;
+  const gross = (exit - pos.entry) * size;
+  const fees = entryFee + exitFee;
   const net = gross - fees;
-  // record trade
-  const seq = ++state.tradeSeq;
-  const rec = { seq, ts: new Date().toISOString(), symbol: sym, side: 'long',
-    entry: pos.entry, exit: exitPx, size, gross: +gross.toFixed(6),
-    fees: +fees.toFixed(6), net: +net.toFixed(6), reason, openedAt: pos.openedAt };
-  appendFileSync(TRADES, JSON.stringify(rec) + '\n');
-  alert(`${sym} ${net >= 0 ? 'WIN' : 'LOSS'} net=${net.toFixed(4)} reason=${reason} seq=${seq}`);
-  if (seq % REPORT_EVERY === 0) reportStats();
+  if (!ledgerHas(readLedger(), sym, pos.openedAt)) {
+    const seq = ++state.tradeSeq;
+    const rec = { seq, ts: new Date().toISOString(), symbol: sym, side: 'long',
+      entry: pos.entry, exit, size, gross: +gross.toFixed(6),
+      fees: +fees.toFixed(6), net: +net.toFixed(6), reason, openedAt: pos.openedAt };
+    appendFileSync(TRADES, JSON.stringify(rec) + '\n');
+    alert(`${sym} ${net >= 0 ? 'WIN' : 'LOSS'} net=${net.toFixed(4)} reason=${reason} seq=${seq}`);
+    if (seq % REPORT_EVERY === 0) reportStats();
+  }
   delete state.positions[sym];
-  return rec;
+  return { net: +net.toFixed(4) };
+}
+
+// ---- reconciliation -------------------------------------------------------
+/**
+ * Compare tracked positions with real holdings. Pure, unit-tested.
+ *  orphans: held on the exchange but not tracked (e.g. a cycle killed right after a buy)
+ *  gone:    tracked but no longer held (e.g. the resting take-profit filled)
+ *  resized: tracked size differs from the real holding by more than 1%
+ */
+export function diffPositions(positions, holdings, prices, dustUsd = DUST_USD) {
+  const orphans = [], gone = [], resized = [];
+  const worth = (pair, qty) => (Number.isFinite(prices[pair]) ? qty * prices[pair] : Infinity);
+  for (const [pair, h] of Object.entries(holdings)) {
+    if (positions[pair]) continue;
+    if (worth(pair, h.total) >= dustUsd) orphans.push({ pair, qty: h.total });
+  }
+  for (const [pair, pos] of Object.entries(positions)) {
+    const qty = holdings[pair]?.total ?? 0;
+    if (worth(pair, qty) < dustUsd) { gone.push(pair); continue; }
+    if (Math.abs(qty / pos.size - 1) > 0.01) resized.push({ pair, qty });
+  }
+  return { orphans, gone, resized };
+}
+
+function historyTrades() {
+  const h = paperHistory();
+  return (h?.trades ?? []).map(t => ({ ...t, ts: Date.parse(t.time) }));
+}
+
+/** Volume-weighted entry of the buys since the last sell on this pair. */
+function inferEntry(trades, pair) {
+  const mine = trades.filter(t => norm(t.pair) === norm(pair)).sort((a, b) => a.ts - b.ts);
+  let lastSell = -1;
+  mine.forEach((t, i) => { if (t.side === 'sell') lastSell = i; });
+  const buys = mine.slice(lastSell + 1).filter(t => t.side === 'buy');
+  if (buys.length === 0) return null;
+  const vol = buys.reduce((s, t) => s + Number(t.volume), 0);
+  const cost = buys.reduce((s, t) => s + Number(t.volume) * Number(t.price), 0);
+  const fee = buys.reduce((s, t) => s + Number(t.fee || 0), 0);
+  return { entry: cost / vol, fee, openedAt: new Date(buys[0].ts).toISOString() };
+}
+
+function reconcile(state, holdings, closed) {
+  const pairs = [...new Set([...Object.keys(holdings), ...Object.keys(state.positions)])];
+  let prices = {};
+  try { prices = lastPrices(pairs); } catch { /* unpriced pairs are treated conservatively */ }
+  const d = diffPositions(state.positions, holdings, prices);
+  if (!d.orphans.length && !d.gone.length && !d.resized.length) return d;
+
+  const trades = historyTrades();
+  for (const pair of d.gone) {
+    const pos = state.positions[pair];
+    const opened = Date.parse(pos.openedAt);
+    const sells = trades.filter(t => norm(t.pair) === norm(pair) && t.side === 'sell' && t.ts >= opened);
+    const tp = sells.find(t => t.order_id === pos.tpOrderId);
+    const fill = tp ?? sells.at(-1);
+    const exit = fill ? Number(fill.price) : (prices[pair] ?? pos.tpPx);
+    const exitFee = fill ? Number(fill.fee || 0) : exit * pos.size * FEE_PER_SIDE;
+    const reason = tp ? 'target_fill' : 'external_close';
+    const r = bookClose(state, pair, pos, { exit, size: pos.size, exitFee, reason });
+    closed.push(`${pair} ${reason} ${r.net}`);
+    saveState(state);
+  }
+
+  for (const { pair, qty } of d.resized) {
+    alert(`RECONCILE ${pair}: tracked size ${state.positions[pair].size} -> held ${qty}`);
+    state.positions[pair].size = qty;
+    saveState(state);
+  }
+
+  let openOrders = null;
+  for (const { pair, qty } of d.orphans) {
+    const inf = inferEntry(trades, pair);
+    let a = 0;
+    try { a = atr(dailyBars(pair), 14); } catch { /* retried next cycle */ }
+    if (!inf || !(a > 0)) {
+      alert(`RECONCILE ${pair}: untracked holding ${qty} — cannot adopt yet (entry=${!!inf} atr=${a > 0})`);
+      continue;
+    }
+    // drop any stray resting orders on this pair, then re-protect with a fresh TP
+    if (openOrders === null) { const oo = paperOrders(); openOrders = oo?.open_orders ?? oo?.orders ?? []; }
+    cancelPair(pair, openOrders);
+    const pos = {
+      side: 'long', size: qty, entry: inf.entry, entryFee: inf.fee,
+      stopPx: inf.entry - STOP_ATR * a, tpPx: inf.entry + TARGET_ATR * a, atr: a,
+      openedAt: inf.openedAt, entryOrderId: null, tpOrderId: null, adopted: true,
+    };
+    state.positions[pair] = pos;
+    saveState(state);
+    sleepSync(500);
+    pos.tpOrderId = limitSell(pair, qty, pos.tpPx);
+    saveState(state);
+    alert(`RECONCILE ${pair}: adopted untracked ${qty} @ ${inf.entry.toFixed(6)} stop=${pos.stopPx.toFixed(6)} tp=${pos.tpPx.toFixed(6)}`);
+  }
+  return d;
+}
+
+// ---- manage ---------------------------------------------------------------
+function closePosition(state, sym, pos, price, reason) {
+  // release the reserved balance: cancel our TP plus any other resting order on this symbol
+  if (pos.tpOrderId) cancel(pos.tpOrderId);
+  const oo = paperOrders();
+  cancelPair(sym, oo?.open_orders ?? oo?.orders ?? []);
+  sleepSync(500);
+  const held = holdingsFrom(balance())[sym];
+  const qty = floor8(Math.min(pos.size, held?.available ?? 0));
+  if (qty * price < MIN_ORDER_USD) {
+    // nothing left to sell (TP filled meanwhile) — reconcile books it next cycle from history
+    logLine(`close ${sym}: nothing available to sell (held=${held?.total ?? 0}), deferring to reconcile`);
+    return null;
+  }
+  const r = sell(sym, qty);
+  const res = bookClose(state, sym, pos, { exit: r.price, size: qty, exitFee: r.fee, reason });
+  saveState(state);
+  return res;
 }
 
 function manage(state) {
   const closed = [];
   const now = Date.now();
-  for (const [sym, pos] of Object.entries(state.positions)) {
-    let price;
-    try { price = lastPrice(sym); } catch { continue; }
-    // stop
-    if (price <= pos.stopPx) {
-      const rec = closePosition(state, sym, pos, price, 'stop');
-      closed.push(`${sym} stop ${rec.net}`);
+  const syms = Object.keys(state.positions);
+  let prices = {};
+  try { prices = lastPrices(syms); } catch { /* skip this cycle */ }
+  for (const sym of syms) {
+    const pos = state.positions[sym];
+    const price = prices[sym];
+    if (!Number.isFinite(price)) continue;
+    let reason = null;
+    if (price <= pos.stopPx) reason = 'stop';
+    else if (price >= pos.tpPx) reason = 'target';
+    else if ((now - Date.parse(pos.openedAt)) / DAY_MS >= HOLD_MAX_DAYS) reason = 'timestop';
+    if (reason) {
+      const r = closePosition(state, sym, pos, price, reason);
+      if (r) closed.push(`${sym} ${reason} ${r.net}`);
       continue;
     }
-    // target
-    if (price >= pos.tpPx) {
-      const rec = closePosition(state, sym, pos, price, 'target');
-      closed.push(`${sym} target ${rec.net}`);
-      continue;
-    }
-    // time stop
-    const ageDays = (now - new Date(pos.openedAt).getTime()) / 86400000;
-    if (ageDays >= HOLD_MAX_DAYS && price < pos.tpPx) {
-      const rec = closePosition(state, sym, pos, price, 'timestop');
-      closed.push(`${sym} timestop ${rec.net}`);
-      continue;
-    }
-    // protection: move stop to break-even (fees covered) once price has run enough
+    // optional protection: move stop to break-even (fees covered) once price has run enough
     if (PROTECT !== 'off' && price > pos.entry) {
-      const feeCostPerUnit = pos.entry * 0.0026 * 2;
+      const feeCostPerUnit = pos.entry * FEE_PER_SIDE * 2;
       if (price - pos.entry >= feeCostPerUnit) {
-        pos.stopPx = Math.max(pos.stopPx, pos.entry + feeCostPerUnit);
+        const be = pos.entry + feeCostPerUnit;
+        if (be > pos.stopPx) { pos.stopPx = be; saveState(state); }
       }
     }
   }
-  sweepStaleImpl(state);
+  sweepStale(state);
   return closed;
 }
 
-function sweepStaleImpl(state) {
-  let oo;
-  try { oo = paperOrders(); } catch { return; }
+/** Cancel resting orders on symbols we no longer hold. Never cancels a tracked take-profit. */
+function sweepStale(state) {
+  const oo = paperOrders();
   const orders = oo?.open_orders ?? oo?.orders ?? [];
-  const norm = (p) => String(p ?? '').replace('/', '');
   const held = new Set(Object.keys(state.positions).map(norm));
   const tracked = new Set(Object.values(state.positions).map(p => p.tpOrderId).filter(Boolean));
   for (const o of orders) {
     const id = o.order_id ?? o.id;
-    if (!id || tracked.has(id)) continue;          // never cancel a live take-profit
-    if (!held.has(norm(o.pair ?? o.symbol))) {
-      try { cancel(id); } catch {}
-    }
+    if (!id || tracked.has(id)) continue;
+    if (!held.has(norm(o.pair ?? o.symbol))) cancel(id);
   }
 }
-
-// sweepStale alias
-const sweepStale = sweepStaleImpl;
 
 // ---- entry ----------------------------------------------------------------
 function blockedByCorr(pair, heldSymbols) {
@@ -353,44 +440,32 @@ function blockedByCorr(pair, heldSymbols) {
 
 function freezeTripped() {
   const clear = () => { try { unlinkSync(FREEZE_FILE); } catch { /* none */ } };
-  if (!existsSync(TRADES)) { clear(); return false; }
-  const recs = readFileSync(TRADES, 'utf8').trim().split('\n').filter(Boolean)
-    .map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  const recs = readLedger();
   if (recs.length <= FREEZE_MIN_TRADES) { clear(); return false; }
-  const wins = recs.filter(r => r.net >= 0).length;
-  const winRate = wins / recs.length;
+  const winRate = recs.filter(r => r.net >= 0).length / recs.length;
   if (winRate >= FREEZE_WINRATE) { clear(); return false; }
   writeFileSync(FREEZE_FILE, `${new Date().toISOString()} winRate=${(winRate*100).toFixed(1)}% over ${recs.length} trades\n`);
   alert(`FREEZE: win rate ${(winRate*100).toFixed(1)}% < ${FREEZE_WINRATE*100}% over ${recs.length} trades — entries halted`);
   return true;
 }
 
-function entry(state, mode, dryRun = false) {
+function entry(state, cur, holdings, dryRun = false) {
   const entered = [];
-  if (mode === 'noentry') return { entered, near: [] };
-  // freeze check: derived from the ledger, auto-clears when the win rate recovers
   if (freezeTripped()) return { entered, near: [], frozen: true };
-  let g;
-  try { g = equity(); } catch { return { entered, near: [] }; }
-  const cur = g.cur;
-  const v = verdict(cur);
-  if (v !== 'RUNNING') return { entered, near: [] };
+  if (verdict(cur) !== 'RUNNING') return { entered, near: [] };
   let market;
   try { market = marketRegime(); } catch { market = { ok: false }; }
   if (!market.ok) return { entered, near: [], market: { ok: false, reason: market.reason } };
-  const b = budgetFor(cur, state);
-  let allowed = b.allowed;
+  let allowed = budgetFor(cur, state).allowed;
   const heldSymbols = Object.keys(state.positions);
-  // gather candidates
   const cands = [];
   for (const pair of UNIVERSE) {
-    if (state.positions[pair]) continue;
+    if (state.positions[pair] || holdings[pair]) continue;   // never buy what we already hold
     let sig;
     try { sig = analyse(pair); } catch { continue; }
     if (!sig) continue;
-    if (!(sig.targetPct >= MIN_TARGET_PCT)) continue;   // fees would eat the edge
-    const blocker = blockedByCorr(pair, heldSymbols);
-    if (blocker) continue;
+    if (!(sig.targetPct >= MIN_TARGET_PCT)) continue;       // fees would eat the edge
+    if (blockedByCorr(pair, heldSymbols)) continue;
     cands.push(sig);
   }
   cands.sort((a, b) => b.ext - a.ext);
@@ -401,40 +476,32 @@ function entry(state, mode, dryRun = false) {
     const stopDist = sig.price - sig.stopPx;
     if (stopDist <= 0) continue;
     let size = allowed / stopDist;
-    // notional cap
-    const maxNotional = cur * 0.20;
+    const maxNotional = cur * MAX_NOTIONAL_PCT;
     if (size * sig.price > maxNotional) size = maxNotional / sig.price;
-    size = Math.floor(size * 1e8) / 1e8;
-    if (size <= 0) continue;
-    // min order size
-    if (size * sig.price < 0.5) continue;
+    size = floor8(size);
+    if (size * sig.price < MIN_ORDER_USD) continue;
     if (dryRun) {
       entered.push(`dry ${sig.pair} ext=${sig.ext.toFixed(2)} size=${size}`);
-      allowed = Math.max(0, allowed - (Math.abs(sig.price - sig.stopPx) * size));
+      allowed = Math.max(0, allowed - stopDist * size);
       continue;
     }
-    try {
-      const r = buy(sig.pair, size);
-      const entryPx = r.price || sig.price;
-      const filled = Number(r.size) || size;
-      // re-anchor stop/target to the real fill price (qoder 2026-10-28)
-      const stopPx = entryPx - STOP_ATR * sig.atr;
-      const tpPx = entryPx + TARGET_ATR * sig.atr;
-      state.positions[sig.pair] = {
-        side: 'long', size: filled, entry: entryPx, stopPx, tpPx,
-        atr: sig.atr, ext: sig.ext,
-        openedAt: new Date().toISOString(), entryOrderId: r.orderId, tpOrderId: null,
-      };
-      // place TP resting
-      try {
-        const tp = limitSell(sig.pair, filled, tpPx);
-        state.positions[sig.pair].tpOrderId = tp?.order_id ?? tp?.id ?? null;
-      } catch {}
-      allowed = Math.max(0, allowed - (Math.abs(entryPx - stopPx) * filled));
-      entered.push(`${sig.pair} ext=${sig.ext.toFixed(2)}`);
-    } catch (e) {
-      logLine(`entry failed ${sig.pair}: ${e.message}`);
-    }
+    let r;
+    try { r = buy(sig.pair, size); }
+    catch (e) { logLine(`entry failed ${sig.pair}: ${e.message}`); continue; }
+    // persist the fill before anything else can fail
+    const stopPx = r.price - STOP_ATR * sig.atr;
+    const tpPx = r.price + TARGET_ATR * sig.atr;
+    const pos = {
+      side: 'long', size: r.size, entry: r.price, entryFee: r.fee, stopPx, tpPx,
+      atr: sig.atr, ext: sig.ext, openedAt: new Date().toISOString(),
+      entryOrderId: r.orderId, tpOrderId: null,
+    };
+    state.positions[sig.pair] = pos;
+    saveState(state);
+    pos.tpOrderId = limitSell(sig.pair, r.size, tpPx);
+    saveState(state);
+    allowed = Math.max(0, allowed - (r.price - stopPx) * r.size);
+    entered.push(`${sig.pair} ext=${sig.ext.toFixed(2)}`);
   }
   return { entered, near };
 }
@@ -443,7 +510,7 @@ function entry(state, mode, dryRun = false) {
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes('unfreeze')) {
-    try { (await import('node:fs')).unlinkSync(FREEZE_FILE); } catch {}
+    try { unlinkSync(FREEZE_FILE); } catch {}
     console.log(JSON.stringify({ unfrozen: true }));
     return;
   }
@@ -451,50 +518,53 @@ async function main() {
     console.log(JSON.stringify({ frozen: existsSync(FREEZE_FILE), file: FREEZE_FILE }));
     return;
   }
-  const mode = args.includes('noentry') ? 'noentry' : 'auto';
-  const noEntry = mode === 'noentry';
-const dryRun = args.includes('--dry-run');
+  if (existsSync(HALTED)) {
+    console.log(JSON.stringify({ positions: 0, closed: [], entered: [], halted: true }));
+    return;
+  }
+  const noEntry = args.includes('noentry');
+  const dryRun = args.includes('--dry-run');
   try {
     const pw = await prewarm();
     if (pw.fetched || pw.failed) logLine(`prewarm: refreshed=${pw.fetched} failed=${pw.failed} of ${pw.total}`);
   } catch (e) { logLine(`prewarm failed: ${e.message}`); }
+
   const state = loadState();
-  let g;
-  try { g = equity(); } catch (e) {
-    console.log(JSON.stringify({ error: e.message }));
-    process.exit(1);
-  }
-  state.status = verdict(g.cur);
-  // manage
-  const closed = manage(state);
-  // sweep (already inside manage)
-  // sweepStaleImpl(state);
-  // entry
-  const er = entry(state, noEntry ? 'noentry' : 'auto', dryRun);
-  const entered = er.entered ?? [];
-  const near = er.near;
-  // flatten on terminal verdict
-  const v = verdict(g.cur);
-  if (v !== 'RUNNING') {
+  const bal = balance();
+  if (!bal) throw new Error('balance unavailable');
+  const closed = [];
+  const rec = reconcile(state, holdingsFrom(bal), closed);
+
+  const closedByManage = manage(state);
+  closed.push(...closedByManage);
+
+  const g = equity();
+  const holdings = holdingsFrom(g.bal ?? bal);
+  const er = noEntry ? { entered: [], near: [] } : entry(state, g.cur, holdings, dryRun);
+
+  // flatten only on a terminal verdict that survives a second read
+  const cv = confirmedVerdict(g);
+  if (cv.glitch) logLine(`verdict glitch ignored: ${JSON.stringify(cv.glitch)}`);
+  if (cv.verdict !== 'RUNNING') {
     for (const sym of Object.keys(state.positions)) {
-      const pos = state.positions[sym];
       try {
-        const price = lastPrice(sym);
-        closePosition(state, sym, pos, price, v.toLowerCase());
+        const r = closePosition(state, sym, state.positions[sym], lastPrice(sym), cv.verdict.toLowerCase());
+        if (r) closed.push(`${sym} ${cv.verdict.toLowerCase()} ${r.net}`);
       } catch (e) { logLine(`flatten failed ${sym}: ${e.message}`); }
     }
+    writeFileSync(HALTED, `${new Date().toISOString()} ${cv.verdict} equity=${cv.cur.toFixed(2)}\n`);
+    alert(`HALTED: confirmed ${cv.verdict} at $${cv.cur.toFixed(2)}`);
   }
-  // save state
   saveState(state);
-  // summary
-  const summary = {
+  console.log(JSON.stringify({
     positions: Object.keys(state.positions).length,
     closed,
-    entered,
-    near,
-    blocked: [],
-  };
-  console.log(JSON.stringify(summary));
+    entered: er.entered ?? [],
+    near: er.near,
+    frozen: !!er.frozen,
+    reconciled: { orphans: rec.orphans.length, gone: rec.gone.length, resized: rec.resized.length },
+    equitySource: g.source,
+  }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

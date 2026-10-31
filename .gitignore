@@ -1,19 +1,22 @@
 # Runtime / generated state (do not commit)
-bot.log
+state.json
+state.json.tmp
+runner.state.json
+trades.jsonl
 equity.csv
 alerts.log
-trades.jsonl
-state.json
-runner.state.json
-runner.err
+bot.log*
 watchdog.log
-watchdog.err
+watchdog.lock
+*.err
+*.log
+*.log.1
 FAILURE_SENTINEL
 FROZEN
+HALTED
 ENTRY_ENABLED
 ohlc.1d.cache.json
 hist.*.json
-*.log
 
 # OS / editor
 .DS_Store
@@ -24,5 +27,3 @@ Thumbs.db
 # Node
 node_modules/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
