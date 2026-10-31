@@ -127,8 +127,14 @@ enough history yet for the BTC EMA200. The result:
 
 - capital is well protected (the worst equity was $1000)
 - trades are rare and small, far from what +12% would need
-- reaching PASS would take a looser entry, a larger target or more risk, each validated
-  by backtest first
+
+**Can another configuration reach $1120?** A follow-up search says no, not with the
+available data. It covered 17k configurations, used a held-out period and unseen pairs,
+and stress-tested stop fills. See [docs/RESEARCH.md](docs/RESEARCH.md).
+
+- Larger risk does produce PASSes with perfect stop fills.
+- Those PASSes disappear, or turn into BUSTs, once stop fills are realistic.
+- All of them come from a single bull episode.
 
 ## Configuration
 
@@ -155,8 +161,10 @@ environment variables first.
 | `riskpolicy.mjs` | equity-linked risk ladder and ratchet |
 | `watchdog.sh`, `kspot`, `killprocs.sh`, `resume.sh` | keep alive / start / stop / post-reboot restore |
 | `tests.mjs`, `validate.mjs` | offline unit tests, live consistency check |
+| `sweep_live.mjs` | fast challenge simulator mirroring live rules: rolling starts, stop-fill stress, grid search |
 | `backtest.mjs`, `fetch_hist.mjs` | historical simulation and its data download |
 | `sweep_spot.mjs` | legacy parameter sweep (no EMA200 warm-up, pre-v1 parameters) |
 | `scan.mjs`, `fetch_universe.mjs`, `fetch_hist_universe.mjs` | hourly dip scan, universe research |
 | `docs/OPERATIONS.md` | runbook |
+| `docs/RESEARCH.md` | parameter research: can any configuration reach $1120? |
 | `docs/PLAN.md` | original design notes (Spanish, historical) |

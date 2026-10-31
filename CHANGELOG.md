@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Added `sweep_live.mjs`, a fast challenge simulator that mirrors the live rules.
+  - indicators verified identical to `trader.mjs`
+  - rolling starts that run to the end of the data
+  - `STOP_FILL` stress modes: `stop`, `mid`, `low`
+  - sharded grid search with an in-sample cutoff (`IS_END`)
+- Added [docs/RESEARCH.md](docs/RESEARCH.md), a search for a configuration that can reach
+  $1120. Conclusion: none does robustly on the available data. The live configuration is
+  unchanged.
+
 ## 1.1.1 — 2026-10-31
 
 Documentation only.
