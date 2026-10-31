@@ -121,6 +121,10 @@ BASE=v1 node sweep_live.mjs eval '{"RISK_MULT":3,"MAXC":3,"NOTIONAL":0.35}'     
 BASE=v1 node sweep_live.mjs eval '{"RISK_MULT":3,"MAXC":3,"NOTIONAL":0.35,"STOP_FILL":"mid"}'   # 0/48
 node sweep_live.mjs eval '{"STOP_FILL":"low"}'                                       # v1.2: 9/48 PASS, 0 BUST
 IS_END=470 SHARD=0/1 node sweep_live.mjs grid > grid.json                # in-sample grid (~7 min)
+node research/robust.mjs > rob.json     # finding 2: signal quality on 3 data sets (~10 min; SHARD=k/N to parallelise)
+node research/risk.mjs                  # findings 3-4: risk / capacity sweep on the v1.1 signal
+node research/candidates.mjs            # finding 5: minimum equity + trade bootstrap (~3 min)
+node research/screen.mjs u24            # screening evaluation (use u43 for the 43-pair cross-check)
 ```
 
 ## Screening evaluation (v1.2)

@@ -114,10 +114,13 @@ Spot paper has **no native stop orders**, so the runner process *is* the stop.
 
 **Live paper run (2026-10-18 → 2026-10-31).** These trades don't measure the strategy:
 
-- Equity was **$995** (−0.5%), with 8 closed trades and 1 winner (net −$4.93).
-- 6 of the 8 trades were forced exits caused by bugs fixed in v1.1:
-  - 4 false-BUST liquidations
-  - 2 cleanups of untracked duplicate buys
+- Equity was **$994.47** (−0.55%), with 11 closed trades and 1 winner (net −$5.52).
+- None of the 11 measures the strategy:
+  - 4 were false-BUST liquidations and 2 were cleanups of untracked duplicate buys (bugs
+    fixed in v1.1)
+  - 3 were manual closes of positions that failed the corrected v1.2 screen (−$0.60 in
+    fees and spread)
+  - 2 were early trades (1 manual)
 - Until v1.2, every signal was computed **one day late**, because a candle filter dropped
   yesterday's completed candle. Entering a day late roughly halves the edge: in the
   2-year event study it fell from +0.26 R to +0.13 R per trade.
@@ -167,6 +170,7 @@ matching overrides first (see docs/RESEARCH.md).
 | `watchdog.sh`, `kspot`, `killprocs.sh`, `resume.sh` | keep alive / start / stop / post-reboot restore |
 | `tests.mjs`, `validate.mjs` | offline unit tests, live consistency check |
 | `sweep_live.mjs` | fast challenge simulator mirroring live rules: rolling starts, stop-fill stress, grid search |
+| `research/` | the analysis scripts behind docs/RESEARCH.md (event study, robustness, risk sweep, bootstrap) |
 | `backtest.mjs`, `fetch_hist.mjs` | historical simulation and its data download |
 | `sweep_spot.mjs` | legacy parameter sweep (no EMA200 warm-up, pre-v1 parameters) |
 | `scan.mjs`, `fetch_universe.mjs`, `fetch_hist_universe.mjs` | hourly dip scan, universe research |

@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- Added the research scripts behind docs/RESEARCH.md under `research/`:
+  - `screen.mjs` (event study)
+  - `robust.mjs` (signal quality)
+  - `risk.mjs` (risk / capacity sweep)
+  - `candidates.mjs` (bootstrap)
+  - a shared `data.mjs` with the u24 / other / u43 data sets
+  They reproduce the documented numbers exactly and pin `LIVE_V1` as their base.
+- README: live results updated to 11 trades, none of which measure the strategy.
+
 ## 1.2.0 — 2026-10-31
 
 Changes from the screening review. See [docs/RESEARCH.md](docs/RESEARCH.md#screening-evaluation-v12).
