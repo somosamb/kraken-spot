@@ -11,6 +11,7 @@ All commands run from the repo directory, or from `KS_DIR` if you set it.
 | Dashboard | `npm run status` |
 | Full health check | `npm run validate` (exit 0 = consistent) |
 | One manual cycle, no new trades | `npm run cycle:dry` |
+| Close positions by hand | `npm stop`, then `node trader.mjs close all` (or `close BTC/USD …`), then `npm start`. Cancels the TP, sells at market, books the trade with reason `manual` and sets the cooldown. |
 | After a reboot | `sh resume.sh` (start, wait one cycle, then validate and run the tests) |
 
 To keep the bot alive across crashes and reboots, run `kspot` from cron. It does nothing
@@ -33,7 +34,7 @@ A healthy system shows:
 |---|---|---|---|
 | `ENTRY_ENABLED` | you | Runner opens new trades. Without it the runner only manages open positions. | `rm` it, then `npm stop && npm start` |
 | `HALTED` | bot, on a confirmed PASS/BUST | Runner, watchdog and `kspot` refuse to run | `rm HALTED` after reviewing |
-| `FROZEN` | bot, when the win rate is below 55% over more than 15 trades | No new entries | Clears itself when the win rate recovers. `node trader.mjs unfreeze` forces it. |
+| `FROZEN` | bot, when the win rate is below 55% over more than 15 strategy trades (`stop`, `target`, `target_fill`, `timestop` since 2026-10-31 14:15 UTC) | No new entries | Clears itself when the win rate recovers. `node trader.mjs unfreeze` forces it. |
 | `FAILURE_SENTINEL` | runner, on a failed cycle | Informational | Clears itself on the next good cycle |
 
 The mode (`ENTRY_ENABLED`) is read when the runner starts, so restart after changing it.
@@ -60,6 +61,7 @@ Possible close reasons in the ledger:
 | `timestop` | position held for 10 days |
 | `external_close` | position closed outside the bot |
 | `pass` / `bust` | flattened on a confirmed terminal verdict |
+| `manual` | closed by hand with `node trader.mjs close` |
 
 ## Reading `near=[…]`
 

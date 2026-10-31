@@ -34,14 +34,23 @@ Changes from the screening review. See [docs/RESEARCH.md](docs/RESEARCH.md#scree
   Simulated: 9/48 PASS and 0 BUST with worst-case stop fills, median 445 days to PASS.
   All of that evidence comes from a single bull episode.
 
+### Changed (operations)
+- **Freeze sample.** The win-rate freeze now counts only strategy exits (`stop`, `target`,
+  `target_fill`, `timestop`) since the v1.2 epoch. Before, the old ledger (1 win in 11,
+  mostly bug-forced or manual closes) would have frozen v1.2 after its first few trades.
+- The 3 positions inherited from v1.1 (BTC, ARB, NEAR) were closed by hand (−$0.60 net in
+  total), because none of them passed the corrected screen.
+
 ### Added
+- `node trader.mjs close <PAIR…|all>` closes positions by hand through the normal close
+  path.
 - `screen()` returns a diagnostic with a reject tag for every pair. `bot.log` shows the five
   deepest dips with their tags (`near=[…]`). The tags are documented in
   [OPERATIONS](docs/OPERATIONS.md#reading-near).
 - `sweep_live.mjs` gained a `MIN_ATR_PCT` option. Its default configuration is now v1.2;
   `BASE=v1` reproduces v1.1.
-- 20 new tests (58 in total), covering screening tags, cooldown, drift, the 60-day
-  correlation, the risk multiplier and the candle-completion fix.
+- 21 new tests (59 in total), covering screening tags, cooldown, drift, the 60-day
+  correlation, the risk multiplier, the candle-completion fix and the freeze sample.
 
 ## Research (2026-10-31)
 

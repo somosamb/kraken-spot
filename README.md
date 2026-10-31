@@ -108,7 +108,7 @@ Spot paper has **no native stop orders**, so the runner process *is* the stop.
 | False PASS/BUST | Requires confirmation by a second read. |
 | Restart after game over | `HALTED` blocks the runner, the watchdog and `kspot`. |
 | Runner down during a rally | The take-profit rests on the exchange as a limit order. |
-| Losing streak | Entries freeze while the win rate is below 55% over more than 15 trades. The freeze clears itself when the win rate recovers. |
+| Losing streak | Entries freeze while the win rate is below 55% over more than 15 strategy exits since v1.2. The freeze clears itself when the win rate recovers. |
 
 ## Results
 

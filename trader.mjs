@@ -472,9 +472,21 @@ function blockedByCorr(pair, heldSymbols) {
   return null;
 }
 
+/**
+ * Trades that measure the strategy: its own exits, since the v1.2 rules went live.
+ * Forced liquidations from old bugs (bust/flatten), manual closes and external closes
+ * say nothing about the signal and must not trip the freeze.
+ */
+export const STRATEGY_EPOCH = '2026-10-31T14:15:00.000Z';
+const STRATEGY_REASONS = new Set(['stop', 'target', 'target_fill', 'timestop']);
+export function strategyTrades(recs, epoch = STRATEGY_EPOCH) {
+  const t0 = Date.parse(epoch);
+  return recs.filter(r => STRATEGY_REASONS.has(r.reason) && Date.parse(r.ts) >= t0);
+}
+
 function freezeTripped() {
   const clear = () => { try { unlinkSync(FREEZE_FILE); } catch { /* none */ } };
-  const recs = readLedger();
+  const recs = strategyTrades(readLedger());
   if (recs.length <= FREEZE_MIN_TRADES) { clear(); return false; }
   const winRate = recs.filter(r => r.net >= 0).length / recs.length;
   if (winRate >= FREEZE_WINRATE) { clear(); return false; }
@@ -560,6 +572,21 @@ async function main() {
   }
   if (args.includes('freeze-status')) {
     console.log(JSON.stringify({ frozen: existsSync(FREEZE_FILE), file: FREEZE_FILE }));
+    return;
+  }
+  if (args[0] === 'close') {
+    // manual close through the normal path: cancel TP, market sell, ledger, cooldown, save
+    const state = loadState();
+    const want = args[1] === 'all' ? Object.keys(state.positions) : args.slice(1);
+    const closed = [];
+    for (const sym of want) {
+      const pos = state.positions[sym];
+      if (!pos) { closed.push(`${sym} not held`); continue; }
+      const r = closePosition(state, sym, pos, lastPrice(sym), 'manual');
+      closed.push(r ? `${sym} manual ${r.net}` : `${sym} nothing to sell (reconcile will book it)`);
+    }
+    saveState(state);
+    console.log(JSON.stringify({ closed, positions: Object.keys(state.positions).length }));
     return;
   }
   if (existsSync(HALTED)) {

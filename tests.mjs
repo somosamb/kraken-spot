@@ -4,7 +4,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { riskFor, scaledRiskFor, RISK_MULT } from './riskpolicy.mjs';
-import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom } from './trader.mjs';
+import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom, strategyTrades } from './trader.mjs';
 import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR } from './ctl.mjs';
 import { parseFill } from './spot.mjs';
 
@@ -132,6 +132,18 @@ console.log('ledger dedupe');
 const recs = [{ symbol: 'TRX/USD', openedAt: '2026-10-27T11:40:07.342Z' }];
 ok(ledgerHas(recs, 'TRX/USD', '2026-10-27T11:40:07.342Z'), 'same symbol+openedAt is a duplicate');
 ok(!ledgerHas(recs, 'TRX/USD', '2026-10-28T00:00:00.000Z'), 'different openedAt is a new trade');
+
+console.log('freeze sample');
+const ledger = [
+  { reason: 'bust', ts: '2026-10-28T17:42:00Z', net: -1 },
+  { reason: 'stop', ts: '2026-10-27T13:26:00Z', net: -1 },        // old rules
+  { reason: 'manual', ts: '2026-10-31T14:20:00Z', net: -0.2 },
+  { reason: 'target_fill', ts: '2026-11-02T10:00:00Z', net: 2 },
+  { reason: 'stop', ts: '2026-11-03T10:00:00Z', net: -3 },
+  { reason: 'timestop', ts: '2026-11-04T10:00:00Z', net: 0.1 },
+];
+const st2 = strategyTrades(ledger);
+ok(st2.length === 3 && st2.every(r => ['target_fill', 'stop', 'timestop'].includes(r.reason)), 'freeze counts only strategy exits since the v1.2 epoch');
 
 console.log('static guards');
 const runner = readFileSync(`${DIR}/runner.mjs`, 'utf8');
