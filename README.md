@@ -57,16 +57,23 @@ Each cycle runs four steps:
    - a software stop at `entry − 1.5 ATR`
    - a resting limit take-profit at `entry + 0.75 ATR`
    - a 10-day time stop
-3. **Entry.** Every filter must pass:
+3. **Entry.** Every pair is screened on its last *completed* daily candle. Every filter
+   must pass:
 
-   | Filter | Rule |
-   |---|---|
-   | Market regime | BTC is above its EMA200, and the EMA200 is rising |
-   | Pair trend | price is above its own EMA200 |
-   | Dip | price is at least `K = 1.25` ATR below EMA20 |
-   | Fees | target is at least 1.6%, which clears the 0.52% round-trip fee |
-   | Correlation | at most 0.65 against any held position |
-   | Capacity | at most 2 positions, and the pair is not already held |
+   | Filter | Rule | Reject tag |
+   |---|---|---|
+   | Market regime | BTC is above its EMA200, and the EMA200 is rising | `regime` |
+   | Pair trend | price is above its own EMA200 | `downtrend` |
+   | Dip | price is at least `K = 1.25` ATR below EMA20 | `shallow` |
+   | Volatility | ATR is at least 3% of price. Quiet pairs get oversized positions, and lost money in testing. | `lowvol` |
+   | Fees | target is at least 1.6%. This is implied by the volatility floor and kept as a guard. | `fees` |
+   | Cooldown | the pair was not closed earlier the same UTC day | `cooldown` |
+   | Correlation | 60-day correlation is at most 0.65 against every held position, including ones opened earlier in the same cycle | `corr:XXX` |
+   | Price drift | the live price is within 0.5 ATR of the signal close | `drift` |
+   | Capacity | at most 3 positions, risk budget left, and the pair is not already held | `full` |
+
+   Candidates are ranked by dip depth, deepest first. The five deepest pairs and their
+   reject tags appear in each `bot.log` line as `near=[…]`.
 
 4. **Terminal check.** A PASS or BUST reading must survive a second read 5 s later. Only
    then does the bot flatten all positions, write `HALTED`, and stop for good.
@@ -80,8 +87,13 @@ equity.
 - It starts at **$0 at the floor** and rises linearly to $7 at $1045.
 - From there it rises to $20 at the target.
 - It is multiplied by 1.5× from $1015 and by 2× from $1045.
+- Since v1.2 everything is multiplied by **×3** (`RISK_MULT`). At $1000 that is about $8
+  of risk per trade.
 - Total open risk is capped at **$75**.
-- Each position's notional is capped at **20% of equity**.
+- Each position's notional is capped at **35% of equity**.
+
+The risk is a fraction of the remaining cushion, so a losing streak on its own can't reach
+the floor. The remaining BUST risk is a stop that fills far below its price.
 
 ### Safety model
 
@@ -100,41 +112,34 @@ Spot paper has **no native stop orders**, so the runner process *is* the stop.
 
 ## Results
 
-**Live paper run (2026-10-18 → 2026-10-31)**
+**Live paper run (2026-10-18 → 2026-10-31).** These trades don't measure the strategy:
 
-- Equity was **$995** (−0.5%).
-- There were 8 closed trades and 1 winner, for a net of −$4.93.
-- 6 of the 8 trades were forced exits caused by bugs that v1.1 fixed (see the
-  [CHANGELOG](CHANGELOG.md)):
+- Equity was **$995** (−0.5%), with 8 closed trades and 1 winner (net −$4.93).
+- 6 of the 8 trades were forced exits caused by bugs fixed in v1.1:
   - 4 false-BUST liquidations
   - 2 cleanups of untracked duplicate buys
-- The sample is not informative yet.
+- Until v1.2, every signal was computed **one day late**, because a candle filter dropped
+  yesterday's completed candle. Entering a day late roughly halves the edge: in the
+  2-year event study it fell from +0.26 R to +0.13 R per trade.
 
-**Backtest of the live configuration.** This covers 2 years of daily bars, split into
-four 180-day blocks:
+**Research summary** (2 years of daily data; details in
+[docs/RESEARCH.md](docs/RESEARCH.md)):
 
-```sh
-K=1.25 TARGET_ATR=0.75 STOP_ATR=1.5 HOLD=10 MIN_TP=1.6 EMA200=1 REGIME=1 node backtest.mjs
-```
+| Configuration | Expectancy per trade | PASS / 48 starts | BUST | Median days to PASS |
+|---|---|---|---|---|
+| v1.1 (×1 risk, 2 positions) | +0.31 R | 0 | 0 | — |
+| **v1.2** (ATR ≥ 3%, ×3 risk, 3 positions, 35% notional) | **+0.43 R** | **9** | **0**, also with worst-case stop fills | 445 |
 
-| Strategy | PASS | BUST | Entries | Win rate | Best block |
-|---|---|---|---|---|---|
-| dip (live) | 0/4 | 0/4 | 22 | 82% | +1.0% |
-| breakout (reference) | 0/4 | 0/4 | 85 | 59% | −0.3% |
+Caveats, in order of importance:
 
-The live filters are very selective. Block 1 has no trades at all, because there isn't
-enough history yet for the BTC EMA200. The result:
+1. Every v1.2 PASS starts in the 2025 bull phase. That is a single episode. In the bear
+   phase the regime filter keeps the bot flat: 0 PASS, 0 BUST.
+2. The ATR floor was found after looking at the data. In practice it removes TRX (and a
+   few quiet BTC days), and results fall off a cliff below a 2.75% threshold.
+3. With 19 smaller alt pairs added, worst-case stop fills do cause BUSTs.
 
-- capital is well protected (the worst equity was $1000)
-- trades are rare and small, far from what +12% would need
-
-**Can another configuration reach $1120?** A follow-up search says no, not with the
-available data. It covered 17k configurations, used a held-out period and unseen pairs,
-and stress-tested stop fills. See [docs/RESEARCH.md](docs/RESEARCH.md).
-
-- Larger risk does produce PASSes with perfect stop fills.
-- Those PASSes disappear, or turn into BUSTs, once stop fills are realistic.
-- All of them come from a single bull episode.
+Run `node sweep_live.mjs eval '{}'` to reproduce the v1.2 row, or
+`BASE=v1 node sweep_live.mjs eval '{}'` for v1.1.
 
 ## Configuration
 
@@ -147,8 +152,8 @@ and stress-tested stop fills. See [docs/RESEARCH.md](docs/RESEARCH.md).
 | `KS_NO_CACHE` | — | `1` disables the daily OHLC cache |
 
 Strategy constants are at the top of `trader.mjs`. The risk ladder is in
-`riskpolicy.mjs`. If you change either, re-run `backtest.mjs` with the matching
-environment variables first.
+`riskpolicy.mjs`. If you change either, re-run `sweep_live.mjs eval` with the
+matching overrides first (see docs/RESEARCH.md).
 
 ## Files
 

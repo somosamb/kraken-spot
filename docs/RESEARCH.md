@@ -2,7 +2,11 @@
 
 *2026-10-31 · tool: [`sweep_live.mjs`](../sweep_live.mjs)*
 
-**Short answer: not with the available data.**
+> **Update (v1.2, same day).** The screening evaluation below found a volatility floor
+> (ATR ≥ 3%) that changes the conclusion. The live configuration now uses it with ×3 risk.
+> Findings 1–5 describe the v1.1 configuration (`BASE=v1`).
+
+**Short answer for v1.1: not with the available data.**
 
 - No configuration reaches +12% with a meaningful probability while staying safe under
   realistic stop fills.
@@ -112,11 +116,63 @@ round-trip fees and no native stop orders.
 ## Reproduce
 
 ```sh
-node sweep_live.mjs eval '{}'                                            # live: 0/48 PASS, 0 BUST
-node sweep_live.mjs eval '{"RISK_MULT":3,"MAXC":3,"NOTIONAL":0.35}'      # 1/48 PASS (exact fills)
-node sweep_live.mjs eval '{"RISK_MULT":3,"MAXC":3,"NOTIONAL":0.35,"STOP_FILL":"mid"}'   # 0/48
+BASE=v1 node sweep_live.mjs eval '{}'                                                # v1.1: 0/48 PASS, 0 BUST
+BASE=v1 node sweep_live.mjs eval '{"RISK_MULT":3,"MAXC":3,"NOTIONAL":0.35}'          # 1/48 PASS (exact fills)
+BASE=v1 node sweep_live.mjs eval '{"RISK_MULT":3,"MAXC":3,"NOTIONAL":0.35,"STOP_FILL":"mid"}'   # 0/48
+node sweep_live.mjs eval '{"STOP_FILL":"low"}'                                       # v1.2: 9/48 PASS, 0 BUST
 IS_END=470 SHARD=0/1 node sweep_live.mjs grid > grid.json                # in-sample grid (~7 min)
 ```
+
+## Screening evaluation (v1.2)
+
+This is an event study. For every pair and day, it simulates the trade the live rules
+would open and measures what each screening stage adds. It covers the 24 majors, then the
+43-pair set as a cross-check.
+
+| Stage | Evidence (24 / 43 pairs) | Verdict |
+|---|---|---|
+| Pair EMA200 | without it, 0.00 / +0.01 R per trade; with it, +0.27 / +0.26 R | the key filter |
+| BTC regime | raises expectancy from +0.14 to +0.27 R; the signals it rejects average −0.33 / −0.22 R | keep |
+| Dip threshold K = 1.25 | below it, ~0 R in every bucket; from 1.25, +0.19, and +0.33 for 1.5–2 ATR | well placed |
+| Rank by deepest dip | on days with several signals, the pick averages +0.41 / +0.37 R, against +0.29 for the average signal and +0.26 for the shallowest | keep |
+| `MIN_TP` 1.6% | rejected only 7 signals, and all 7 won | inert; kept as a guard |
+| Correlation guard (full history) | blocked 61% of pair combinations. TRX is the least correlated pair (0.16–0.18), so it was always allowed as a second position. | changed to a 60-day window |
+| Universe | 11 of the 24 pairs never produced a signal in 2 years (always below their EMA200) | harmless |
+| **Volatility below 3% ATR** | −0.13 R, or −0.23 R with mid stop fills. Mostly TRX (−0.37 R per trade). | **new filter** |
+
+In the challenge simulation (24 pairs, worst-case `low` stop fills), the volatility floor
+behaves like this:
+
+| | ×1 risk | ×3 risk, 3 positions, 35% notional |
+|---|---|---|
+| no floor | 0 PASS, 0 BUST, minimum equity $993 | 0 PASS, 0 BUST, minimum equity $976 |
+| ATR ≥ 3% | 0 PASS, 0 BUST, minimum equity $998 | **9 PASS, 0 BUST, minimum equity $993** |
+
+How stable is it? Results by ATR threshold, at ×3–×4 risk with `low` fills:
+
+| ATR threshold | PASS / 48 | BUST |
+|---|---|---|
+| 2.5% | 0 | up to 2 |
+| 2.75–3.25% | 8–10 | 0 |
+| 3.5% | 1–6 | 0 |
+
+The cliff at 2.75% is the TRX boundary, since TRX's ATR averages 2.9% of price. **Treat
+the filter as "exclude the quiet, wick-prone pairs".** It is not a finely tuned optimum.
+
+**Live implementation issues found and fixed during this review:**
+
+1. **Signals lagged by one day.** `barsFrom` used `time < last`, but Kraken's `last` is the
+   open time of the last *completed* candle, so the filter also dropped yesterday's candle.
+   - Delaying entry by one day cuts the expectancy from +0.26 to +0.13 R per trade (from
+     +0.32 to +0.17 R with the ATR floor).
+   - The three positions open when v1.2 shipped (BTC, ARB, NEAR) would not pass the
+     corrected screen.
+2. **Same-day re-entry.** After a stop, the next cycle could buy the same pair again on the
+   same stale signal. A cooldown until the next UTC day now prevents this.
+3. **Stale price.** Entries now require the live price to be within 0.5 ATR of the signal
+   close.
+4. **Correlation inside one cycle.** It was only checked against positions held *before*
+   the cycle. It now also includes positions opened earlier in the same cycle.
 
 ## Open directions (not validated)
 

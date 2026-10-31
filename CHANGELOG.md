@@ -1,6 +1,49 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — 2026-10-31
+
+Changes from the screening review. See [docs/RESEARCH.md](docs/RESEARCH.md#screening-evaluation-v12).
+
+### Fixed
+- **Signals were one day late.**
+  - Before: the candle filter `time < last` also dropped yesterday's completed candle,
+    because Kraken's `last` is the open time of the last completed candle.
+  - Now: a candle counts as complete once its 24 h are over.
+  - Impact: this roughly halved the live edge.
+- **Same-day re-entry.** After an exit, the same pair could be bought again on the same
+  stale signal. Every close now records `lastExit`, and entries skip that pair until the
+  next UTC day.
+- **Stale entry price.** The live price must now be within 0.5 ATR of the signal close,
+  and position size uses the live price.
+- **Correlation inside one cycle.** The guard now also checks positions opened earlier in
+  the same cycle.
+
+### Changed (strategy)
+- **Volatility floor.** Pairs with ATR below 3% of price are skipped (`lowvol`). In testing
+  these traded at −0.13 R, mostly TRX, the source of every worst-case BUST.
+- **Correlation window.** The guard uses the last 60 days of returns instead of the full
+  history. Full-history correlation had pushed second positions toward TRX.
+- **Risk.**
+
+  | Setting | Before | Now |
+  |---|---|---|
+  | Risk multiplier (`RISK_MULT`) | ×1 | ×3 |
+  | Max positions | 2 | 3 |
+  | Notional cap per position | 20% | 35% |
+
+  Simulated: 9/48 PASS and 0 BUST with worst-case stop fills, median 445 days to PASS.
+  All of that evidence comes from a single bull episode.
+
+### Added
+- `screen()` returns a diagnostic with a reject tag for every pair. `bot.log` shows the five
+  deepest dips with their tags (`near=[…]`). The tags are documented in
+  [OPERATIONS](docs/OPERATIONS.md#reading-near).
+- `sweep_live.mjs` gained a `MIN_ATR_PCT` option. Its default configuration is now v1.2;
+  `BASE=v1` reproduces v1.1.
+- 20 new tests (58 in total), covering screening tags, cooldown, drift, the 60-day
+  correlation, the risk multiplier and the candle-completion fix.
+
+## Research (2026-10-31)
 
 - Added `sweep_live.mjs`, a fast challenge simulator that mirrors the live rules.
   - indicators verified identical to `trader.mjs`

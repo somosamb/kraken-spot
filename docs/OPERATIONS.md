@@ -42,7 +42,7 @@ The mode (`ENTRY_ENABLED`) is read when the runner starts, so restart after chan
 
 | File | Content |
 |---|---|
-| `bot.log` | One line per cycle: `eq=… pnl=… prog=… pos=…`, plus errors and alerts. Rotated to `bot.log.1` at 5 MB. |
+| `bot.log` | One line per cycle: `eq=… pnl=… prog=… pos=… near=[…]`, plus errors and alerts. Rotated to `bot.log.1` at 5 MB. |
 | `alerts.log` | Trade closes, `STATS` every 5 trades, `RECONCILE`, `FREEZE`, `HALTED` |
 | `trades.jsonl` | Ledger, one closed trade per line: `seq, symbol, entry, exit, size, gross, fees, net, reason, openedAt`. Deduplicated by `symbol\|openedAt`. |
 | `equity.csv` | Equity snapshot every cycle: `ts, equity, pnl_pct, progress_to_target, source, note`. Grows without limit, so archive it from time to time. |
@@ -60,6 +60,23 @@ Possible close reasons in the ledger:
 | `timestop` | position held for 10 days |
 | `external_close` | position closed outside the bot |
 | `pass` / `bust` | flattened on a confirmed terminal verdict |
+
+## Reading `near=[…]`
+
+`near` lists the five deepest dips among pairs the bot does not hold, as `PAIR:depth(tag)`.
+The depth is in ATRs below EMA20. A pair with no tag is a valid candidate.
+
+| Tag | Meaning |
+|---|---|
+| `regime` | Valid on its own, but the BTC regime is off |
+| `downtrend` | Price is below the pair's EMA200 |
+| `shallow` | The dip is less than K = 1.25 ATR |
+| `lowvol` | ATR is below 3% of price |
+| `fees` | The target is below 1.6% |
+| `cooldown` | The pair was closed earlier today (UTC) |
+| `corr:XXX` | Correlated above 0.65 with held position XXX |
+| `drift` | The live price moved more than 0.5 ATR from the signal close |
+| `full` | 3 positions are already open, or the risk budget is used up |
 
 ## Troubleshooting
 

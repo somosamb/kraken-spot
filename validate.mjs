@@ -63,7 +63,7 @@ const d = diffPositions(state.positions, holdings, prices);
 chk(d.orphans.length === 0, 'no untracked holdings', d.orphans.map(o => `${o.pair}:${o.qty}`).join(' '));
 chk(d.gone.length === 0, 'no tracked positions missing on exchange', d.gone.join(' '));
 chk(d.resized.length === 0, 'tracked sizes match holdings', d.resized.map(o => `${o.pair}:${o.qty}`).join(' '));
-chk(Object.keys(state.positions).length <= 2, 'positions <= MAX_CONCURRENT');
+chk(Object.keys(state.positions).length <= 3, 'positions <= MAX_CONCURRENT (3)');
 const oo = paperOrders();
 const openIds = new Set((oo?.open_orders ?? oo?.orders ?? []).map(o => o.id ?? o.order_id));
 for (const [pair, p] of Object.entries(state.positions)) {

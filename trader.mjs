@@ -28,14 +28,17 @@ const DAY_MS = 86_400_000;
 
 // ---- parameters (validate via sweep before changing) ----------------------
 const K = 1.25;                // entry threshold in ATR units (sweep 2026-10-25: best pass/bust)
-const MIN_TARGET_PCT = 1.6;    // TP must clear ~3x round-trip fees (0.52%) or the trade can't pay
-const MAX_CONCURRENT = 2;      // start conservative
+const MIN_TARGET_PCT = 1.6;    // TP must clear ~3x round-trip fees (0.52%); implied by MIN_ATR_PCT, kept as a guard
+const MIN_ATR_PCT = 3;         // volatility floor: low-ATR pairs get oversized positions and lost money (TRX, research 2026-10-31)
+const MAX_CONCURRENT = 3;
 const CORR_MAX = 0.65;         // skip if corr with a held position exceeds this
+const CORR_WINDOW = 60;        // daily returns used for the correlation guard (recent, not all history)
 const HOLD_MAX_DAYS = 10;
 const STOP_ATR = 1.5;
 const TARGET_ATR = 0.75;
+const PRICE_DRIFT_ATR = 0.5;   // skip an entry if the live price moved more than this from the signal close
 const MIN_BARS = 220;           // EMA200 + 20 bars for its slope
-const MAX_NOTIONAL_PCT = 0.20;  // per-position notional cap (fraction of equity)
+const MAX_NOTIONAL_PCT = 0.35;  // per-position notional cap (fraction of equity)
 const MIN_ORDER_USD = 0.5;
 const PROTECT = process.env.FBOT_PROTECT || 'off';
 const REPORT_EVERY = 5;
@@ -122,8 +125,14 @@ function dailyBars(pair) {
   return entry?.bars ?? [];
 }
 
-function barsFrom(r) {
-  const raw = (r.candles ?? r.ohlc ?? []).filter(c => Number(c.time) < Number(r.last));
+/**
+ * Completed daily candles only. A candle is complete once its 24h are over.
+ * (Do not filter on `r.last`: Kraken's `last` is the open time of the last *completed*
+ * candle, so `time < last` also dropped yesterday's candle and lagged every signal by a
+ * day — bug fixed in v1.2.)
+ */
+export function barsFrom(r, now = Date.now()) {
+  const raw = (r.candles ?? r.ohlc ?? []).filter(c => (Number(c.time) + 86_400) * 1000 <= now);
   return raw.map(c => ({ time:+c.time, open:+c.open, high:+c.high, low:+c.low, close:+c.close }));
 }
 function fetchBars(pair) { return barsFrom(ohlc(pair, 1440)); }
@@ -173,10 +182,10 @@ const corrCache = new Map();
 function closesFor(pair) {
   try { return dailyBars(pair).map(b => b.close); } catch { return []; }
 }
-export function corrWith(pairA, pairB) {
-  const key = [pairA, pairB].sort().join('|');
+export function corrWith(pairA, pairB, window = CORR_WINDOW) {
+  const key = [pairA, pairB].sort().join('|') + `|${window}`;
   if (corrCache.has(key)) return corrCache.get(key);
-  const a = closesFor(pairA), b = closesFor(pairB);
+  const a = closesFor(pairA).slice(-(window + 1)), b = closesFor(pairB).slice(-(window + 1));
   const ra = a.slice(1).map((v,i)=> (v-a[i])/a[i]);
   const rb = b.slice(1).map((v,i)=> (v-b[i])/b[i]);
   const c = pearson(ra, rb);
@@ -201,27 +210,51 @@ export function marketRegime() {
 }
 
 // ---- signal ---------------------------------------------------------------
-export function analyse(pair) {
-  const bars = dailyBars(pair); // daily bars — matches the 2026-10-25 sweep geometry
-  if (bars.length < MIN_BARS) return null;
+/**
+ * Screen one pair on its last completed daily bar. Always returns a diagnostic:
+ * `reason` is null when the pair is a valid candidate, else the first filter it failed.
+ */
+export function screen(pair) {
+  const bars = dailyBars(pair);
+  if (bars.length < MIN_BARS) return { pair, reason: 'history' };
   const closes = bars.map(b => b.close);
   const a = atr(bars, 14);
-  if (!(a > 0)) return null;
+  if (!(a > 0)) return { pair, reason: 'atr' };
   const e20 = ema(closes, 20).at(-1);
   const e200 = ema(closes, 200).at(-1);
   const price = closes.at(-1);
-  if (!(price > e200)) return null;    // pair must be in an uptrend
-  const extDown = (e20 - price) / a;   // positive when price below EMA20
-  if (extDown < K) return null;
-  const stopDist = STOP_ATR * a;
-  const targetDist = TARGET_ATR * a;
-  return {
-    side: 'long', pair, price, ext: extDown, atr: a,
-    stopPx: price - stopDist,
-    tpPx: price + targetDist,
-    stopPct: (stopDist / price) * 100,
-    targetPct: (targetDist / price) * 100,
+  const ext = (e20 - price) / a;               // dip depth in ATRs below EMA20
+  const atrPct = (a / price) * 100;
+  const sig = {
+    side: 'long', pair, price, ext, atr: a, atrPct, barTime: bars.at(-1).time,
+    stopPx: price - STOP_ATR * a,
+    tpPx: price + TARGET_ATR * a,
+    stopPct: STOP_ATR * atrPct,
+    targetPct: TARGET_ATR * atrPct,
   };
+  sig.reason = !(price > e200) ? 'downtrend'          // pair must be above its EMA200
+    : ext < K ? 'shallow'                              // not stretched enough below EMA20
+    : atrPct < MIN_ATR_PCT ? 'lowvol'
+    : sig.targetPct < MIN_TARGET_PCT ? 'fees'
+    : null;
+  return sig;
+}
+
+/** Valid candidate or null (kept for callers/tests that only need the signal). */
+export function analyse(pair) {
+  const s = screen(pair);
+  return s.reason ? null : s;
+}
+
+/** True if the pair was closed during the current UTC day (no same-day re-entry). */
+export function inCooldown(state, pair, now = Date.now()) {
+  const t = Date.parse(state?.lastExit?.[pair] ?? '');
+  return Number.isFinite(t) && t >= Math.floor(now / DAY_MS) * DAY_MS;
+}
+
+/** True if the live price drifted too far from the close the signal was computed on. */
+export function priceDrifted(signalPrice, livePrice, atrAbs, maxAtr = PRICE_DRIFT_ATR) {
+  return !Number.isFinite(livePrice) || Math.abs(livePrice - signalPrice) > maxAtr * atrAbs;
 }
 
 // ---- ledger ---------------------------------------------------------------
@@ -267,6 +300,7 @@ function bookClose(state, sym, pos, { exit, size, exitFee, reason }) {
     if (seq % REPORT_EVERY === 0) reportStats();
   }
   delete state.positions[sym];
+  (state.lastExit ||= {})[sym] = new Date().toISOString();   // drives the same-day cooldown
   return { net: +net.toFixed(4) };
 }
 
@@ -455,31 +489,40 @@ function entry(state, cur, holdings, dryRun = false) {
   if (verdict(cur) !== 'RUNNING') return { entered, near: [] };
   let market;
   try { market = marketRegime(); } catch { market = { ok: false }; }
-  if (!market.ok) return { entered, near: [], market: { ok: false, reason: market.reason } };
-  let allowed = budgetFor(cur, state).allowed;
-  const heldSymbols = Object.keys(state.positions);
-  const cands = [];
+
+  // screen every pair we could buy, keeping the rejection reason for the `near` report
+  const screened = [];
   for (const pair of UNIVERSE) {
     if (state.positions[pair] || holdings[pair]) continue;   // never buy what we already hold
-    let sig;
-    try { sig = analyse(pair); } catch { continue; }
-    if (!sig) continue;
-    if (!(sig.targetPct >= MIN_TARGET_PCT)) continue;       // fees would eat the edge
-    if (blockedByCorr(pair, heldSymbols)) continue;
-    cands.push(sig);
+    let s;
+    try { s = screen(pair); } catch { continue; }
+    if (!Number.isFinite(s.ext)) continue;
+    if (!s.reason && inCooldown(state, pair)) s.reason = 'cooldown';
+    if (!s.reason && !market.ok) s.reason = 'regime';
+    screened.push(s);
   }
-  cands.sort((a, b) => b.ext - a.ext);
-  const near = cands.slice(0, 5).map(c => `${c.pair}:${c.ext.toFixed(2)}`);
+  screened.sort((a, b) => b.ext - a.ext);
+  const nearOf = () => screened.slice(0, 5).map(s => `${s.pair}:${s.ext.toFixed(2)}${s.reason ? `(${s.reason})` : ''}`);
+  if (!market.ok) return { entered, near: nearOf(), market: { ok: false, reason: market.reason } };
+
+  const cands = screened.filter(s => !s.reason);
+  let live = {};
+  if (cands.length) { try { live = lastPrices(cands.map(c => c.pair)); } catch { /* every candidate counts as drifted */ } }
+  let allowed = budgetFor(cur, state).allowed;
   for (const sig of cands) {
-    if (Object.keys(state.positions).length >= MAX_CONCURRENT) break;
-    if (allowed <= 0) break;
-    const stopDist = sig.price - sig.stopPx;
-    if (stopDist <= 0) continue;
+    if (Object.keys(state.positions).length >= MAX_CONCURRENT || allowed <= 0) { sig.reason = 'full'; continue; }
+    // correlation against everything held now, including entries made earlier in this loop
+    const blocker = blockedByCorr(sig.pair, Object.keys(state.positions));
+    if (blocker) { sig.reason = `corr:${blocker.split('/')[0]}`; continue; }
+    // the signal is from the last daily close; only act if the live price is still close to it
+    const px = live[sig.pair];
+    if (priceDrifted(sig.price, px, sig.atr)) { sig.reason = 'drift'; continue; }
+    const stopDist = STOP_ATR * sig.atr;
     let size = allowed / stopDist;
     const maxNotional = cur * MAX_NOTIONAL_PCT;
-    if (size * sig.price > maxNotional) size = maxNotional / sig.price;
+    if (size * px > maxNotional) size = maxNotional / px;
     size = floor8(size);
-    if (size * sig.price < MIN_ORDER_USD) continue;
+    if (size * px < MIN_ORDER_USD) { sig.reason = 'size'; continue; }
     if (dryRun) {
       entered.push(`dry ${sig.pair} ext=${sig.ext.toFixed(2)} size=${size}`);
       allowed = Math.max(0, allowed - stopDist * size);
@@ -502,8 +545,9 @@ function entry(state, cur, holdings, dryRun = false) {
     saveState(state);
     allowed = Math.max(0, allowed - (r.price - stopPx) * r.size);
     entered.push(`${sig.pair} ext=${sig.ext.toFixed(2)}`);
+    sig.reason = 'entered';
   }
-  return { entered, near };
+  return { entered, near: nearOf() };
 }
 
 // ---- main -----------------------------------------------------------------

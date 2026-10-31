@@ -20,11 +20,14 @@ import { riskFor, ratchetFor, PORTFOLIO_CAP } from './riskpolicy.mjs';
 const DIR = process.env.KS_DIR || new URL('.', import.meta.url).pathname.replace(/\/$/, '');
 const FEE = 0.0026, START = 1000, TARGET = 1120, FLOOR = 970;
 
-export const LIVE = {
+/** Live configuration v1.0–1.1 (kept to reproduce docs/RESEARCH.md). */
+export const LIVE_V1 = {
   strategy: 'dip', K: 1.25, STOP_ATR: 1.5, TARGET_ATR: 0.75, HOLD: 10, MIN_TP: 1.6,
   EMA200: true, REGIME: true, MAXC: 2, CORR: 0.65, RISK_MULT: 1, CAP_MULT: 1,
-  NOTIONAL: 0.20, FREEZE: true, FREEZE_WR: 0.55,
+  NOTIONAL: 0.20, FREEZE: true, FREEZE_WR: 0.55, MIN_ATR_PCT: 0,
 };
+/** Live configuration v1.2: ATR floor 3%, risk ×3, 3 positions, 35% notional cap. */
+export const LIVE = { ...LIVE_V1, MIN_ATR_PCT: 3, RISK_MULT: 3, MAXC: 3, NOTIONAL: 0.35 };
 
 // ---- indicators (precomputed once per series) -------------------------------
 function emaSeries(v, p) {
@@ -135,6 +138,7 @@ export function run(D, P, start, end = D.n) {
       const ext = P.strategy === 'dip' ? (s.e20[j] - c) / a : (c - s.e20[j]) / a;
       if (ext < P.K) continue;
       if (100 * P.TARGET_ATR * a / c < P.MIN_TP) continue;
+      if (P.MIN_ATR_PCT && 100 * a / c < P.MIN_ATR_PCT) continue;   // volatility floor (ATR % of price)
       if (held.some(h => Math.abs(corr(s, S[h], i)) > P.CORR)) continue;
       cands.push({ p, ext, c, a });
     }
@@ -185,7 +189,7 @@ const fmt = (P, e) => `pass ${e.pass}/${e.n} bust ${e.bust}/${e.n} medDays ${e.m
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [mode = 'grid', a1, a2, a3, a4] = process.argv.slice(2);
   if (mode === 'eval') {
-    const P = { ...LIVE, ...JSON.parse(a1 || '{}') };
+    const P = { ...(process.env.BASE === 'v1' ? LIVE_V1 : LIVE), ...JSON.parse(a1 || '{}') };
     const D = prepare(JSON.parse(readFileSync(`${DIR}/${a2 || 'hist.spot.1d.json'}`, 'utf8')));
     const e = evaluate(D, P, { from: a3 ? +a3 : 220, to: a4 ? +a4 : D.n - 30 });
     console.log(fmt(P, e));
@@ -206,7 +210,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const RISK_MULT of [1, 2, 3])
     for (const MAXC of [2, 4]) {
       if (++idx % shardN !== shardK) continue;
-      const P = { ...LIVE, strategy, K, STOP_ATR, TARGET_ATR, HOLD, REGIME, EMA200, RISK_MULT, MAXC, FREEZE: false };
+      const P = { ...LIVE_V1, strategy, K, STOP_ATR, TARGET_ATR, HOLD, REGIME, EMA200, RISK_MULT, MAXC, FREEZE: false };
       // in-sample only: IS_END caps the data the search can see (default: all data)
       const isEnd = +(process.env.IS_END || D.n);
       res.push({ P, e: evaluate(D, P, { from: 220, to: isEnd - 30, end: isEnd }) });

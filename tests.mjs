@@ -3,8 +3,8 @@
  * Pure unit tests — no network, no exchange calls. Run: node tests.mjs
  */
 import { readFileSync } from 'node:fs';
-import { riskFor } from './riskpolicy.mjs';
-import { analyse, corrWith, diffPositions, ledgerHas } from './trader.mjs';
+import { riskFor, scaledRiskFor, RISK_MULT } from './riskpolicy.mjs';
+import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom } from './trader.mjs';
 import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR } from './ctl.mjs';
 import { parseFill } from './spot.mjs';
 
@@ -19,23 +19,64 @@ for (const eq of [975, 990, 1000, 1050, 1119]) {
   ok(r <= 0.2 * (eq - 970) + 1e-9, `risk $${r.toFixed(2)} <= 20% of cushion at $${eq}`);
 }
 ok(riskFor(970) === 0, 'risk 0 at floor');
+ok(near(scaledRiskFor(1000), riskFor(1000) * RISK_MULT, 1e-3) && RISK_MULT === 3, 'policy = ladder x3 below the ratchet');
+ok(scaledRiskFor(1119) === 75, 'policy capped at $75');
+ok(scaledRiskFor(970) === 0, 'policy 0 at floor (cushion-proportional: losing streaks cannot reach it)');
 
 console.log('verdict');
 ok(verdict(1120) === 'PASS' && verdict(970) === 'BUST' && verdict(1000) === 'RUNNING', 'PASS / BUST / RUNNING thresholds');
 ok(confirmedVerdict({ cur: 1000 }).verdict === 'RUNNING', 'non-terminal verdict needs no second read');
 
-console.log('signal');
-const bars = [];
-for (let i = 0; i < 200; i++) { const p = 100 + i; bars.push({ open: p - 0.5, high: p + 1, low: p - 1, close: p }); }
-for (let i = 1; i <= 40; i++) { const p = 300 - i; bars.push({ open: p + 0.5, high: p + 1, low: p - 1, close: p }); }
+console.log('screening');
+// uptrend then a sharp dip; `vol` = half the daily range as a fraction of price
+const mkBars = (vol, dipDays = 6, dipPct = 0.035) => {
+  const out = [];
+  let p = 100;
+  for (let i = 0; i < 240; i++) {
+    p = i < 240 - dipDays ? p * 1.004 : p * (1 - dipPct);
+    out.push({ time: i * 86400, open: p, high: p * (1 + vol), low: p * (1 - vol), close: p });
+  }
+  return out;
+};
+const volatile = mkBars(0.03);          // ATR ~6% of price
+const quiet = mkBars(0.006, 6, 0.012);  // same shape, ATR ~1.5% of price
+const downtrend = mkBars(0.03).map((b, i, a) => ({ ...a[a.length - 1 - i], time: b.time }));
+const shallow = mkBars(0.03, 1, 0.01);
 const flat = Array.from({ length: 80 }, () => ({ high: 101, low: 99, close: 100 }));
-globalThis.__TEST_BARS__ = { 'TEST/USD': bars, 'TWIN/USD': bars, 'FLAT/USD': flat };
+globalThis.__TEST_BARS__ = { 'TEST/USD': volatile, 'TWIN/USD': volatile, 'QUIET/USD': quiet,
+  'DOWN/USD': downtrend, 'SHALLOW/USD': shallow, 'FLAT/USD': flat };
 const sig = analyse('TEST/USD');
-ok(sig && sig.side === 'long', 'oversold dip in uptrend -> long signal');
+ok(sig && sig.side === 'long' && sig.reason === null, 'volatile dip in uptrend -> candidate');
 ok(sig && sig.stopPx < sig.price && sig.tpPx > sig.price, 'stop < entry < target');
 ok(sig && near((sig.tpPx - sig.price) / (sig.price - sig.stopPx), 0.5, 1e-6), 'target = 0.5R (0.75 / 1.5 ATR)');
-ok(analyse('FLAT/USD') === null, 'flat / short history -> no signal');
+ok(sig && sig.atrPct >= 3 && sig.barTime === volatile.at(-1).time, 'diagnostic carries ATR% and signal bar time');
+ok(screen('QUIET/USD').reason === 'lowvol' && analyse('QUIET/USD') === null, 'same dip with ATR < 3% -> rejected as lowvol (TRX fix)');
+ok(screen('DOWN/USD').reason === 'downtrend', 'price below EMA200 -> downtrend');
+ok(screen('SHALLOW/USD').reason === 'shallow', 'dip smaller than K ATR -> shallow');
+ok(screen('FLAT/USD').reason === 'history', 'short history -> history');
+
+console.log('daily candles (one-day-lag fix)');
+const day = 86400, t0 = 1793232000;   // 2026-10-29T00:00Z
+const resp = { last: t0 + day, candles: [0, 1, 2].map(k => ({ time: t0 + k * day, open: 1, high: 1, low: 1, close: k })) };
+const kept = barsFrom(resp, (t0 + 2 * day + 14 * 3600) * 1000);   // 2026-10-31 14:00Z
+ok(kept.length === 2 && kept.at(-1).time === t0 + day, "yesterday's completed candle kept, today's forming candle dropped");
+ok(barsFrom(resp, (t0 + 3 * day) * 1000).length === 3, 'a candle counts as complete exactly when its 24h end');
+
+console.log('entry guards');
+const now = Date.UTC(2026, 9, 31, 15, 0, 0);
+ok(inCooldown({ lastExit: { 'X/USD': '2026-10-31T09:00:00.000Z' } }, 'X/USD', now), 'exit earlier today -> cooldown (no same-day re-entry)');
+ok(!inCooldown({ lastExit: { 'X/USD': '2026-10-30T23:59:00.000Z' } }, 'X/USD', now), 'exit yesterday -> free on a new daily bar');
+ok(!inCooldown({}, 'X/USD', now) && !inCooldown(undefined, 'X/USD', now), 'never exited -> no cooldown');
+ok(!priceDrifted(100, 100.9, 2), 'live price within 0.5 ATR of the signal close -> ok');
+ok(priceDrifted(100, 101.1, 2) && priceDrifted(100, 98.9, 2), 'live price beyond 0.5 ATR either way -> drifted');
+ok(priceDrifted(100, NaN, 2), 'no live price -> treated as drifted');
+
+console.log('correlation');
 ok(near(corrWith('TEST/USD', 'TWIN/USD'), 1, 1e-9), 'corrWith of identical series = 1 (offline)');
+const tailSame = volatile.map((b, i) => (i < 150 ? { ...b, close: b.close * (1 + 0.05 * Math.sin(i)) } : b));
+globalThis.__TEST_BARS__['TAIL/USD'] = tailSame;
+ok(near(corrWith('TEST/USD', 'TAIL/USD'), 1, 1e-9), 'corr uses only the last 60 days (older divergence ignored)');
+ok(corrWith('TEST/USD', 'TAIL/USD', 239) < 0.99, 'a full-history window would see the divergence');
 
 console.log('equity selection (false-BUST fix)');
 const bal = { balances: {
@@ -101,6 +142,10 @@ ok(/HALTED/.test(watchdog) && /flock -n/.test(watchdog), 'watchdog respects HALT
 ok(/HALTED/.test(runner) && /confirmedVerdict/.test(runner), 'runner halts only on a confirmed verdict');
 const afterBuy = trader.slice(trader.indexOf('r = buy(sig.pair, size)'));
 ok(afterBuy.indexOf('saveState(state)') < afterBuy.indexOf('limitSell('), 'state saved right after a buy, before the TP order');
+const entrySrc = trader.slice(trader.indexOf('function entry('), trader.indexOf('// ---- main'));
+ok(/inCooldown\(state, pair\)/.test(entrySrc) && /priceDrifted\(/.test(entrySrc), 'entry applies cooldown and price-drift guards');
+ok(/lastExit/.test(trader.slice(trader.indexOf('function bookClose'), trader.indexOf('// ---- reconciliation'))), 'every close records lastExit (stop, TP, reconcile)');
+ok(/blockedByCorr\(sig\.pair, Object\.keys\(state\.positions\)\)/.test(entrySrc), 'corr checked against positions opened earlier in the same cycle');
 ok(!/\/home\/oc/.test(runner + trader + readFileSync(`${DIR}/ctl.mjs`, 'utf8')), 'no hard-coded home paths');
 
 console.log(`\n${pass} passed, ${fail} failed`);

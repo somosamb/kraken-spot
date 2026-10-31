@@ -25,8 +25,17 @@ export function riskFor(equity) {
   return +Math.min(RISK_MAX, RISK_KNEE + slope * (equity - KNEE)).toFixed(4);
 }
 
+/**
+ * Global multiplier on the ladder (v1.2: ×3). Research 2026-10-31 (docs/RESEARCH.md):
+ * with the ATR ≥ 3% screen, ×3 gave 9/48 PASS and 0 BUST on the 24 majors even with
+ * worst-case stop fills — but from a single bull episode, median ~445 days to PASS.
+ * Because the ladder sizes each loss as a fraction of the remaining cushion, losing
+ * streaks alone cannot reach the floor; the residual risk is stop slippage.
+ */
+export const RISK_MULT = 3;
+
 export function scaledRiskFor(equity) {
-  return +Math.min(riskFor(equity) * ratchetFor(equity), PORTFOLIO_CAP).toFixed(4);
+  return +Math.min(riskFor(equity) * ratchetFor(equity) * RISK_MULT, PORTFOLIO_CAP).toFixed(4);
 }
 
 export function openRisk(pos) {
