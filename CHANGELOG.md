@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Added
+- **Network monitor** (`net.mjs` + `runner.mjs`) for a bot running on a phone with
+  unreliable signal.
+  - Each cycle combines the previous cycle's CLI latency and network errors, a direct API
+    probe, cycle success and the gap since the previous cycle into a state: `OK`,
+    `DEGRADED`, `INTERMITTENT` or `OFFLINE`.
+  - Hysteresis: 5 good cycles to recover, and 30 clean minutes after flapping.
+  - New entries are blocked unless the state is `OK`. Open positions are always managed.
+  - State changes are logged, written to `alerts.log` and sent as a detached Termux phone
+    notification with a hard kill after 20 s.
+- `ctl.kraken()` now uses `spawnSync` so it can see stderr on successful calls. A
+  "could not sync … Network error" warning used to pass silently and now counts as a
+  network incident.
+- New diagnostics:
+  - `cyc=` (cycle duration) on every log line
+  - `kraken-calls.log` (slow or failed calls)
+  - a `net` line on the dashboard
+  - a network check in `validate.mjs`
+- 21 new tests (80 in total) covering every state transition and the network-error
+  classification.
+
 - Added the research scripts behind docs/RESEARCH.md under `research/`:
   - `screen.mjs` (event study)
   - `robust.mjs` (signal quality)

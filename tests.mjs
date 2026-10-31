@@ -5,7 +5,8 @@
 import { readFileSync } from 'node:fs';
 import { riskFor, scaledRiskFor, RISK_MULT } from './riskpolicy.mjs';
 import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom, strategyTrades } from './trader.mjs';
-import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR } from './ctl.mjs';
+import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError } from './ctl.mjs';
+import { initialNet, step as netStep, entriesAllowed, p90 } from './net.mjs';
 import { parseFill } from './spot.mjs';
 
 let pass = 0, fail = 0;
@@ -145,7 +146,63 @@ const ledger = [
 const st2 = strategyTrades(ledger);
 ok(st2.length === 3 && st2.every(r => ['target_fill', 'stop', 'timestop'].includes(r.reason)), 'freeze counts only strategy exits since the v1.2 epoch');
 
+console.log('network monitor');
+{
+  const M = 60_000;
+  const good = (ts) => ({ ts, gapS: 50, probeOk: true, cycleOk: true, calls: { n: 6, netFails: 0, p90: 1000 } });
+  const run = (net, obs) => netStep(net, obs).net;
+  let n = initialNet(0), t = 0;
+  for (let i = 0; i < 10; i++) n = run(n, good(t += M));
+  ok(n.state === 'OK' && entriesAllowed(n), 'steady good cycles -> OK, entries allowed');
+
+  let r = netStep(n, { ...good(t += M), calls: { n: 6, netFails: 1, p90: 1000 } });
+  ok(r.to === 'DEGRADED' && !entriesAllowed(r.net) && /network errors/.test(r.reason), 'one network error -> DEGRADED, entries blocked');
+  n = r.net;
+  for (let i = 0; i < 4; i++) n = run(n, good(t += M));
+  ok(n.state === 'DEGRADED', 'still DEGRADED after 4 good cycles (hysteresis)');
+  n = run(n, good(t += M));
+  ok(n.state === 'OK', 'back to OK after 5 good cycles');
+
+  ok(netStep(n, { ...good(t + M), calls: { n: 6, netFails: 0, p90: 4000 } }).to === 'DEGRADED', 'slow calls (p90 > 2.5 s) -> DEGRADED');
+  ok(netStep(n, { ...good(t + M), gapS: 150 }).to === 'DEGRADED', 'cycle gap > 120 s -> DEGRADED');
+  ok(netStep(n, { ...good(t + M), probeOk: false }).to === 'DEGRADED', 'failed probe alone -> DEGRADED');
+  ok(netStep(n, { ...good(t + M), gapS: 400 }).to === 'OFFLINE', 'gap > 5 min (signal lost / phone asleep) -> OFFLINE');
+
+  // probe down + 2 failed cycles in a row -> OFFLINE
+  let o = netStep(n, { ...good(t += M), probeOk: false, cycleOk: false });
+  ok(o.to === 'DEGRADED', 'probe down + 1 failed cycle -> DEGRADED');
+  o = netStep(o.net, { ...good(t += M), probeOk: false, cycleOk: false });
+  ok(o.to === 'OFFLINE', 'probe down + 2 failed cycles -> OFFLINE');
+  o = netStep(o.net, good(t += M));
+  ok(o.to === 'DEGRADED', 'first good cycle after OFFLINE -> DEGRADED (not trusted yet)');
+  n = o.net;
+  for (let i = 0; i < 5; i++) n = run(n, good(t += M));
+  ok(n.state === 'OK', 'OFFLINE -> DEGRADED -> OK after 5 good cycles');
+
+  // flapping: 3 incidents within an hour -> INTERMITTENT, sticky for 30 clean minutes
+  let f = initialNet(0); t = 0;
+  for (let k = 0; k < 3; k++) {
+    f = run(f, { ...good(t += M), probeOk: false });
+    for (let i = 0; i < 5; i++) f = run(f, good(t += M));
+  }
+  ok(f.state === 'INTERMITTENT', '3 incidents within an hour -> INTERMITTENT');
+  for (let i = 0; i < 10; i++) f = run(f, good(t += M));
+  ok(f.state === 'INTERMITTENT' && !entriesAllowed(f), 'INTERMITTENT holds through 10 clean minutes');
+  for (let i = 0; i < 25; i++) f = run(f, good(t += M));
+  ok(f.state === 'OK', 'INTERMITTENT clears after 30 clean minutes');
+
+  ok(isNetworkError('Network error: error sending request for url (https://api.kraken.com/0/public/Ticker)'), 'CLI "Network error" classified as network');
+  ok(isNetworkError('', { code: 'ETIMEDOUT' }) && isNetworkError('getaddrinfo EAI_AGAIN api.kraken.com'), 'timeouts and DNS failures classified as network');
+  ok(!isNetworkError('EOrder:Insufficient funds'), 'exchange rejections are not network errors');
+  ok(p90([1, 2, 3, 4, 5, 6, 7, 8, 9, 100]) === 100 && p90([]) === 0, 'p90 helper');
+}
+
 console.log('static guards');
+{
+  const rs = readFileSync(`${DIR}/runner.mjs`, 'utf8');
+  ok(/entriesAllowed\(net\) \? 'auto' : 'noentry'/.test(rs), 'runner blocks entries unless the network is OK');
+  ok(/stdio: 'ignore', detached: true/.test(rs) && /SIGKILL/.test(rs), 'phone notification is detached with a hard kill');
+}
 const runner = readFileSync(`${DIR}/runner.mjs`, 'utf8');
 const watchdog = readFileSync(`${DIR}/watchdog.sh`, 'utf8');
 const trader = readFileSync(`${DIR}/trader.mjs`, 'utf8');

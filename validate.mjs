@@ -20,7 +20,7 @@ const chk = (c, n, d = '') => (c ? ok(n, d) : bad(n, d));
 console.log(`\n=== VALIDATION  ${new Date().toISOString()} ===\n`);
 
 console.log('[1] code parses');
-for (const f of ['ctl.mjs', 'spot.mjs', 'trader.mjs', 'runner.mjs', 'riskpolicy.mjs', 'validate.mjs', 'tests.mjs']) {
+for (const f of ['ctl.mjs', 'spot.mjs', 'trader.mjs', 'runner.mjs', 'riskpolicy.mjs', 'net.mjs', 'validate.mjs', 'tests.mjs']) {
   try { execFileSync(process.execPath, ['--check', `${DIR}/${f}`]); ok(`${f} parses`); }
   catch (e) { bad(`${f} parses`, e.message.slice(0, 80)); }
 }
@@ -43,6 +43,11 @@ else {
   chk(runners === 1, 'runner alive');
   chk(watchdogs === 1, 'watchdog alive');
 }
+try {
+  const n = JSON.parse(readFileSync(`${DIR}/net.state.json`, 'utf8'));
+  if (n.net.state === 'OK') ok('network OK', `probe ${n.probeMs}ms`);
+  else note(`network ${n.net.state}`, `${n.reason}; entries blocked`);
+} catch { note('network state unknown', 'net.state.json missing'); }
 if (existsSync(`${DIR}/FAILURE_SENTINEL`)) note('FAILURE_SENTINEL present', readFileSync(`${DIR}/FAILURE_SENTINEL`, 'utf8').trim());
 
 console.log('\n[3] equity');

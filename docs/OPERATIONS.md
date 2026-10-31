@@ -49,6 +49,8 @@ The mode (`ENTRY_ENABLED`) is read when the runner starts, so restart after chan
 | `equity.csv` | Equity snapshot every cycle: `ts, equity, pnl_pct, progress_to_target, source, note`. Grows without limit, so archive it from time to time. |
 | `state.json` | Open positions (entry, stop, TP, TP order id), peak and trough, trade counter |
 | `runner.state.json` | Last cycle number, timestamp, status |
+| `net.state.json` | Network monitor state and last observation |
+| `kraken-calls.log` | Slow, failed or lock-retried CLI calls (diagnostics) |
 | `watchdog.log` | Runner restarts |
 
 Possible close reasons in the ledger:
@@ -62,6 +64,37 @@ Possible close reasons in the ledger:
 | `external_close` | position closed outside the bot |
 | `pass` / `bust` | flattened on a confirmed terminal verdict |
 | `manual` | closed by hand with `node trader.mjs close` |
+
+## Network monitor
+
+The bot runs on a phone, so connectivity is monitored on every cycle.
+
+**Inputs:**
+- the CLI calls of the previous cycle: latency, plus network errors and network warnings
+  on stderr
+- a direct probe to `api.kraken.com/0/public/Time` (5 s limit)
+- whether the last cycle completed
+- the time since the previous cycle
+
+| State | Entered when | Entries |
+|---|---|---|
+| `OK` | No problems | allowed |
+| `DEGRADED` | Any of these: a network error, call p90 above 2.5 s, a failed probe, a failed cycle, or more than 120 s between cycles | **blocked** |
+| `INTERMITTENT` | 3 incidents within one hour | blocked; needs 30 clean minutes to clear |
+| `OFFLINE` | No cycle for more than 5 min, or the probe is down and 2 cycles failed in a row | blocked (and nothing reaches the exchange anyway) |
+
+- **Recovery:** returning to `OK` takes 5 good cycles in a row (~5 min).
+- **What you see on each state change:**
+  - a `NET A -> B (reason)` line in `bot.log` and `alerts.log`
+  - a phone notification (Termux, `KS_NOTIFY=0` to disable)
+  - the `net` line on the dashboard
+  - `net=STATE` on every log line, with `(noentry)` added while entries are blocked
+- **After a restart:** the first cycle measures the gap since the runner last ran. Any
+  downtime longer than 5 min therefore shows up as `OFFLINE` and has to recover like any
+  other incident.
+- **Files:**
+  - `net.state.json`: the current state and the last observation
+  - `kraken-calls.log`: every CLI call that was slow (> 3 s), failed, or needed lock retries
 
 ## Reading `near=[…]`
 
@@ -90,6 +123,7 @@ The depth is in ATRs below EMA20. A pair with no tag is a valid candidate.
 | `RECONCILE …: cannot adopt yet` | No trade history or ATR was available for that holding | The bot retries each cycle. If it persists, sell the holding by hand. |
 | `cycle N failed …` repeated, `FATAL` | Every cycle fails, usually because the CLI or network is down | Run `kraken paper status -o json` by hand. The watchdog restarts the runner automatically. |
 | `validate` FAIL: untracked / missing / size mismatch | State and exchange disagree | Wait one cycle (reconcile fixes it). If it persists, run `npm run cycle:dry` and read `alerts.log`. |
+| `net=DEGRADED(noentry)` or `NET … -> OFFLINE` | Weak or lost signal. The bot keeps managing positions but opens none. | Nothing. It recovers by itself after 5 good cycles (30 clean minutes if `INTERMITTENT`). Check `kraken-calls.log` for details. |
 | More than 1 runner or watchdog | Should not happen (`flock`) | `npm stop`, check `pgrep -af runner.mjs`, then `npm start` |
 
 ## Reset the challenge

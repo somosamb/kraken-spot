@@ -11,6 +11,7 @@
 import {
   DIR, KRAKEN, equity, verdict, confirmedVerdict, loadState, saveState, ohlc, lastPrice,
   lastPrices, paperOrders, paperHistory, balance, holdingsFrom, FEE_PER_SIDE, DUST_USD, HALTED,
+  takeCallStats,
 } from './ctl.mjs';
 import { buy, sell, limitSell, cancel, cancelPair } from './spot.mjs';
 import { budgetFor } from './riskpolicy.mjs';
@@ -635,12 +636,13 @@ async function main() {
     frozen: !!er.frozen,
     reconciled: { orphans: rec.orphans.length, gone: rec.gone.length, resized: rec.resized.length },
     equitySource: g.source,
+    net: takeCallStats(),
   }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((e) => {
-    console.log(JSON.stringify({ error: e.stack || e.message }));
+    console.log(JSON.stringify({ error: e.stack || e.message, net: takeCallStats() }));
     process.exit(1);
   });
 }

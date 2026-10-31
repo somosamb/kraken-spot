@@ -13,7 +13,7 @@
  *   KRAKEN_BIN    kraken CLI binary (default: `kraken` on PATH)
  *   KS_WORKSPACE  paper workspace name (default: spotbot)
  */
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,27 +52,70 @@ function parseResult(out) {
 const LOCK_MSG = 'in use by another process';
 export const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
+/** Calls slower than this, or that needed lock retries, are recorded in kraken-calls.log. */
+const SLOW_CALL_MS = 3000;
+
+/** True for failures caused by connectivity (not by the exchange rejecting a request). */
+export function isNetworkError(msg = '', err = {}) {
+  if (err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM') return true;
+  return /network error|error sending request|timed? ?out|dns|connection (refused|reset|closed)|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|unreachable|tls|certificate/i.test(msg);
+}
+
+// per-process call statistics, drained once per cycle by takeCallStats()
+let callLog = [];
+/** Return and reset this process's CLI call stats: { n, netFails, ms: [...] }. */
+export function takeCallStats() {
+  const s = { n: callLog.length, netFails: callLog.filter(c => c.net).length, ms: callLog.map(c => c.ms) };
+  callLog = [];
+  return s;
+}
+
+function noteCall(args, t0, attempts, outcome) {
+  const ms = Date.now() - t0;
+  callLog.push({ ms, net: outcome === 'neterror' || outcome === 'timeout' || outcome === 'netwarn' });
+  if (callLog.length > 500) callLog.shift();
+  if (ms < SLOW_CALL_MS && attempts === 0 && outcome === 'ok') return;
+  try {
+    appendFileSync(`${DIR}/kraken-calls.log`,
+      `${new Date().toISOString()} ${ms}ms lockRetries=${attempts} ${outcome} ${args.filter(a => a !== '-o' && a !== 'json').slice(0, 4).join(' ')}\n`);
+  } catch { /* diagnostics only */ }
+}
+
 export function kraken(args, { allowFail = false, retries = 8, workspace = true } = {}) {
   let lastErr = null;
   const full = workspace ? ['--workspace', WS, ...args] : args;
+  const t0 = Date.now();
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) sleepSync(400 + attempt * 350);
     try {
-      const out = execFileSync(KRAKEN, full, {
+      // spawnSync (not execFileSync) so stderr is visible even when the command succeeds:
+      // the CLI can return data while warning "could not sync … Network error" on stderr.
+      const r = spawnSync(KRAKEN, full, {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: 32 * 1024 * 1024,
         timeout: 60_000,
       });
+      if (r.error || r.status !== 0) {
+        const e = r.error ?? new Error(`exit ${r.status}`);
+        Object.assign(e, { stderr: r.stderr, stdout: r.stdout, signal: r.signal ?? e.signal });
+        throw e;
+      }
+      const out = r.stdout ?? '';
       if (!out.trim()) throw new Error('empty response');
-      return parseResult(out);
+      const res = parseResult(out);
+      noteCall(args, t0, attempt, isNetworkError(r.stderr ?? '') ? 'netwarn' : 'ok');
+      return res;
     } catch (err) {
       const msg = (err.stderr || err.stdout || err.message || '').toString().trim();
       if (msg.includes(LOCK_MSG)) { lastErr = msg; continue; }
+      noteCall(args, t0, attempt,
+        err.code === 'ETIMEDOUT' || err.signal === 'SIGTERM' ? 'timeout' : isNetworkError(msg, err) ? 'neterror' : 'error');
       if (allowFail) return null;
       throw new Error(`kraken ${args.join(' ')} -> ${msg.slice(0, 400)}`);
     }
   }
+  noteCall(args, t0, retries + 1, 'lock');
   if (allowFail) return null;
   throw new Error(`kraken ${args.join(' ')} -> lock still held after ${retries + 1} tries: ${lastErr?.slice(0, 200)}`);
 }
@@ -243,6 +286,12 @@ export function report() {
   const open = paperOrders() ?? {};
   const openOrders = open.open_orders ?? open.orders ?? [];
   const halted = existsSync(HALTED);
+  let netLine = 'net      unknown (runner not started yet)';
+  try {
+    const n = JSON.parse(readFileSync(`${DIR}/net.state.json`, 'utf8'));
+    const mins = Math.round((Date.now() - n.net.since) / 60000);
+    netLine = `net      ${n.net.state} for ${mins} min  probe ${n.probeMs}ms  ${n.net.state === 'OK' ? '' : 'entries blocked'}`;
+  } catch { /* no runner yet */ }
 
   const bar = (pct, w = 26) => {
     const n = Math.max(0, Math.min(w, Math.round((pct / 100) * w)));
@@ -260,6 +309,7 @@ export function report() {
     row(`runway   ${f(distTarget)}% to PASS  |  ${f(distFloor)}% to BUST`),
     row(`peak     $${f(s.peak)}   trough $${f(s.trough)}   src ${e.source}`),
     row(`cash     $${f(Number(bal?.balances?.USD?.available ?? 0))}   positions ${Object.keys(s.positions).length}   openOrders ${openOrders.length}`),
+    row(netLine),
     `└──────────────────────────────────────────────────┘`,
   ];
   return { text: lines.join('\n'), cur, verdict: v, progress, pnl, state: s, source: e.source, halted };
