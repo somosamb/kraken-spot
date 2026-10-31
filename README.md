@@ -1,144 +1,162 @@
-# Kraken Spot Paper — Autonomous Trading Bot
+# kraken-spot
 
-A small, self-hosted bot that trades a **Kraken Spot Paper** workspace through the
-`kraken` CLI. It plays a "funded challenge" game:
+Autonomous long-only trading bot for a **Kraken Spot Paper** workspace, driven through the
+`kraken` CLI. It plays a funded-challenge game:
 
-| Rule | Value |
-|---|---|
-| Starting balance | $1000 |
-| **PASS** | equity ≥ $1120 (+12%) |
-| **BUST** | equity ≤ $970 (−3%, static from start) |
-| Time / daily limits | none |
+| Start | PASS | BUST | Limits |
+|---|---|---|---|
+| $1000 | equity ≥ $1120 (+12%) | equity ≤ $970 (−3%, static) | no time or daily limit |
 
-> **Paper trading only.** This is an experiment and a learning project, not financial
-> advice. It has not demonstrated an edge (see [Results](#results)). Do not point it at
-> real money.
+> [!WARNING]
+> **Paper trading only.** This is an experiment, not financial advice. The strategy has
+> **not** shown an edge (see [Results](#results)). Do not adapt it to real money.
+
+## Quick start
+
+Requirements:
+
+- Linux (`flock` and `pgrep`)
+- Node.js ≥ 18
+- `kraken` CLI on `PATH`, or set `KRAKEN_BIN`
+
+```sh
+kraken paper init spotbot --capital 1000   # one-time: funded paper workspace
+npm test                                   # offline unit tests (no network, no orders)
+npm run cycle:dry                          # one live cycle, entries simulated
+touch ENTRY_ENABLED                        # allow new trades (omit = manage-only)
+npm start                                  # watchdog + runner, idempotent
+npm run status                             # dashboard
+npm run validate                           # live consistency check
+```
+
+The runbook in [docs/OPERATIONS.md](docs/OPERATIONS.md) covers:
+
+- starting and stopping the bot
+- monitoring
+- control files
+- cron setup
+- troubleshooting
 
 ## How it works
 
-Every ~45 s the runner executes one **cycle** (`trader.mjs loop`):
+```mermaid
+flowchart LR
+  W[watchdog.sh] -->|keeps alive| R[runner.mjs]
+  R -->|every ~1 min| T[trader.mjs cycle]
+  T --> A[1. reconcile] --> B[2. manage] --> C[3. entry] --> D[4. terminal check]
+  D -->|confirmed PASS/BUST| H[(HALTED)]
+```
 
-1. **Reconcile:** compare `state.json` with the real exchange balances.
-   - It adopts holdings that aren't tracked. This happens when a cycle was killed right
-     after a buy.
-   - It books positions that are gone. This happens when the resting take-profit filled.
-   - It fixes tracked sizes that don't match the real holding.
-2. **Manage** each open position:
-   - software stop at `entry − 1.5 ATR`
-   - take-profit at `entry + 0.75 ATR`
-   - 10-day time stop
-   - optional break-even stop (`FBOT_PROTECT`)
-3. **Entry**, which only runs if every filter passes:
-   - **Market regime:** BTC is above its EMA200, and the EMA200 is rising.
-   - **Pair trend:** the price is above its own EMA200.
-   - **Dip:** the price is at least `K = 1.25` ATR below EMA20.
-   - **Fees:** the target is at least 1.6%, so it clears the 0.52% round-trip fees.
-   - **Correlation:** the pair's correlation with any held position is at most 0.65.
-   - **Limits:** at most 2 concurrent positions, and the pair is not already held.
-4. **Terminal check:** a PASS or BUST reading has to survive a second independent read.
-   Only then does the bot flatten all positions, write a `HALTED` file and stop for good.
+Each cycle runs four steps:
 
-Signals use completed **daily** candles, cached on disk with one refresh per UTC day.
+1. **Reconcile.** Compare `state.json` with the real balances on the exchange.
+   - Adopt untracked holdings.
+   - Book positions that are gone (for example, the take-profit filled).
+   - Fix sizes that don't match.
+2. **Manage** each open position. The exits are:
+   - a software stop at `entry − 1.5 ATR`
+   - a resting limit take-profit at `entry + 0.75 ATR`
+   - a 10-day time stop
+3. **Entry.** Every filter must pass:
 
-### Risk
+   | Filter | Rule |
+   |---|---|
+   | Market regime | BTC is above its EMA200, and the EMA200 is rising |
+   | Pair trend | price is above its own EMA200 |
+   | Dip | price is at least `K = 1.25` ATR below EMA20 |
+   | Fees | target is at least 1.6%, which clears the 0.52% round-trip fee |
+   | Correlation | at most 0.65 against any held position |
+   | Capacity | at most 2 positions, and the pair is not already held |
 
-`riskpolicy.mjs` sets the dollar amount the bot may lose on one trade (stop distance ×
-size).
+4. **Terminal check.** A PASS or BUST reading must survive a second read 5 s later. Only
+   then does the bot flatten all positions, write `HALTED`, and stop for good.
 
-- It is **0 at the floor** and grows linearly to $7 at $1045, then to $20 at the target.
-- On top of that a **ratchet** multiplies it by 1.5× from $1015 and by 2× from $1045.
-- It is capped at **$75 of open risk** across all positions.
-- Each position's notional is also capped at **20% of equity**.
+Signals use completed **daily** candles from a 24-pair universe of large-cap coins. The
+candles are cached on disk and refreshed once per UTC day.
+
+**Risk** (`riskpolicy.mjs`): the dollar risk per trade (stop distance × size) is tied to
+equity.
+
+- It starts at **$0 at the floor** and rises linearly to $7 at $1045.
+- From there it rises to $20 at the target.
+- It is multiplied by 1.5× from $1015 and by 2× from $1045.
+- Total open risk is capped at **$75**.
+- Each position's notional is capped at **20% of equity**.
 
 ### Safety model
 
 Spot paper has **no native stop orders**, so the runner process *is* the stop.
 
-| Risk | Mitigation |
+| Failure | Mitigation |
 |---|---|
-| Daemon dies | `watchdog.sh` (single instance via `flock`) restarts the runner. `kspot` restarts the watchdog. |
-| Cycle hangs | 600 s cycle timeout. After 8 consecutive failures the runner stops for review. |
-| Cycle killed mid-trade | State is written atomically right after every buy, sell and TP order. The next cycle reconciles. |
-| Bogus equity reading | The venue figure is cross-checked against our own mark-to-market valuation and rejected if they disagree by more than 1% or the venue flags it incomplete. |
-| False PASS/BUST | The verdict must be confirmed by a second read 5 s later. |
-| Restart after game over | `HALTED` blocks the runner, watchdog and `kspot` until you delete it. |
-| Daemon down + price spike | Take-profits rest on the exchange as limit sells. |
-| Losing streak | Entries freeze automatically if the win rate drops below 55% after 15 trades. The freeze clears when the win rate recovers. |
+| Runner dies | The watchdog (single instance via `flock`) restarts it. `kspot`, run from cron, restarts the watchdog. |
+| Cycle hangs | Killed after 600 s. After 8 consecutive failures the runner exits and the watchdog restarts it. |
+| Cycle killed mid-trade | `state.json` is written atomically after every buy, sell and TP order. The next cycle reconciles. |
+| Bogus equity reading | The venue figure is cross-checked against our own mark-to-market valuation. It is rejected if it differs by more than 1% or is flagged incomplete. |
+| False PASS/BUST | Requires confirmation by a second read. |
+| Restart after game over | `HALTED` blocks the runner, the watchdog and `kspot`. |
+| Runner down during a rally | The take-profit rests on the exchange as a limit order. |
+| Losing streak | Entries freeze while the win rate is below 55% over more than 15 trades. The freeze clears itself when the win rate recovers. |
 
-## Requirements
+## Results
 
-- Node.js ≥ 18
-- `kraken` CLI on `PATH`, or set `KRAKEN_BIN`
-- A funded paper workspace:
+**Live paper run (2026-10-18 → 2026-10-31)**
 
-  ```sh
-  kraken paper init spotbot --capital 1000
-  ```
+- Equity was **$995** (−0.5%).
+- There were 8 closed trades and 1 winner, for a net of −$4.93.
+- 6 of the 8 trades were forced exits caused by bugs that v1.1 fixed (see the
+  [CHANGELOG](CHANGELOG.md)):
+  - 4 false-BUST liquidations
+  - 2 cleanups of untracked duplicate buys
+- The sample is not informative yet.
 
-## Usage
+**Backtest of the live configuration.** This covers 2 years of daily bars, split into
+four 180-day blocks:
 
 ```sh
-npm test              # offline unit tests (no network, no orders)
-npm run validate      # live consistency check: processes, equity, state vs exchange
-npm run status        # dashboard
-npm run cycle:dry     # one cycle; entries are simulated (reconcile/manage still act)
-
-touch ENTRY_ENABLED   # allow new entries (absent = manage-only "noentry" mode)
-npm start             # start watchdog (which starts the runner); idempotent
-npm stop              # stop watchdog + runner
+K=1.25 TARGET_ATR=0.75 STOP_ATR=1.5 HOLD=10 MIN_TP=1.6 EMA200=1 REGIME=1 node backtest.mjs
 ```
 
-| File / flag | Meaning |
-|---|---|
-| `ENTRY_ENABLED` | Present: runner opens new trades. Absent: it only manages existing ones. |
-| `HALTED` | Written on a confirmed PASS/BUST. Delete it to resume. |
-| `FROZEN` | Written while the win-rate freeze is active (auto-cleared). |
-| `FAILURE_SENTINEL` | Last cycle failed. Cleared automatically on the next successful cycle. |
+| Strategy | PASS | BUST | Entries | Win rate | Best block |
+|---|---|---|---|---|---|
+| dip (live) | 0/4 | 0/4 | 22 | 82% | +1.0% |
+| breakout (reference) | 0/4 | 0/4 | 85 | 59% | −0.3% |
 
-### Configuration
+The live filters are very selective. Block 1 has no trades at all, because there isn't
+enough history yet for the BTC EMA200. The result:
 
-| Env var | Default | |
+- capital is well protected (the worst equity was $1000)
+- trades are rare and small, far from what +12% would need
+- reaching PASS would take a looser entry, a larger target or more risk, each validated
+  by backtest first
+
+## Configuration
+
+| Env var | Default | Purpose |
 |---|---|---|
-| `KS_DIR` | repo directory | where state, logs and caches live |
+| `KS_DIR` | repo directory | state, logs and caches |
 | `KRAKEN_BIN` | `kraken` | CLI binary |
 | `KS_WORKSPACE` | `spotbot` | paper workspace |
-| `FBOT_PROTECT` | `off` | anything else enables the break-even stop |
-| `KS_NO_CACHE` | — | `1` disables the OHLC disk cache |
+| `FBOT_PROTECT` | `off` | any other value enables the break-even stop |
+| `KS_NO_CACHE` | — | `1` disables the daily OHLC cache |
 
-Strategy constants live at the top of `trader.mjs`, and the risk ladder lives in
-`riskpolicy.mjs`. If you change them, re-run the backtest sweep first.
-
-### Backtesting
-
-```sh
-node fetch_hist.mjs        # download daily OHLC for the universe -> hist.spot.1d.json
-node sweep_spot.mjs        # parameter sweep over 180-day blocks (PASS / BUST counts)
-```
+Strategy constants are at the top of `trader.mjs`. The risk ladder is in
+`riskpolicy.mjs`. If you change either, re-run `backtest.mjs` with the matching
+environment variables first.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `ctl.mjs` | CLI wrapper, rules, equity (with cross-check), state I/O, dashboard |
-| `spot.mjs` | buy / sell / limit / cancel, fill parsing |
 | `trader.mjs` | one cycle: reconcile → manage → entry → terminal check |
-| `runner.mjs` | daemon loop, snapshots, failure handling, HALTED |
-| `watchdog.sh` | keeps exactly one runner alive |
-| `kspot`, `resume.sh`, `killprocs.sh` | start / post-reboot restore / stop |
-| `riskpolicy.mjs` | equity-linked risk ladder + ratchet |
-| `backtest.mjs`, `sweep_spot.mjs`, `fetch_*.mjs` | historical simulation |
-| `scan.mjs` | quick hourly dip scan of the universe |
-| `tests.mjs`, `validate.mjs` | unit tests, live consistency check |
+| `runner.mjs` | daemon loop, equity snapshots, failure handling, `HALTED` |
+| `ctl.mjs` | CLI wrapper, rules, equity cross-check, state I/O, dashboard |
+| `spot.mjs` | buy / sell / limit / cancel, fill parsing |
+| `riskpolicy.mjs` | equity-linked risk ladder and ratchet |
+| `watchdog.sh`, `kspot`, `killprocs.sh`, `resume.sh` | keep alive / start / stop / post-reboot restore |
+| `tests.mjs`, `validate.mjs` | offline unit tests, live consistency check |
+| `backtest.mjs`, `fetch_hist.mjs` | historical simulation and its data download |
+| `sweep_spot.mjs` | legacy parameter sweep (no EMA200 warm-up, pre-v1 parameters) |
+| `scan.mjs`, `fetch_universe.mjs`, `fetch_hist_universe.mjs` | hourly dip scan, universe research |
+| `docs/OPERATIONS.md` | runbook |
 | `docs/PLAN.md` | original design notes (Spanish, historical) |
-
-## Results
-
-Live paper run, 2026-10-18 → 2026-10-31:
-
-- Equity **$995** (−0.5%).
-- **8 closed trades, 1 winner** (net −$4.93).
-- Six of those eight were forced exits caused by bugs fixed in v1.1, listed in
-  [CHANGELOG](CHANGELOG.md):
-  - false BUST liquidations from cash-only equity readings
-  - untracked duplicate buys
-- So far the sample says **nothing** about the strategy's edge either way.

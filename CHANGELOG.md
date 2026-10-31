@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.1.1 — 2026-10-31
+
+Documentation only.
+
+- README rewritten around a quick start, a cycle diagram and an honest **Results** section.
+  It now includes a backtest of the live configuration: 0/4 PASS, 0/4 BUST, 22 entries
+  in 2 years.
+- New [docs/OPERATIONS.md](docs/OPERATIONS.md) runbook:
+  - start, stop and cron
+  - control files
+  - logs and the ledger schema
+  - troubleshooting by log message
+  - challenge reset
+- Corrected claims that didn't match the code:
+  - The cycle interval is ~1 min, not 45 s.
+  - After 8 failures the runner exits and the watchdog restarts it; it does not stay
+    stopped.
+  - The win-rate freeze needs *more than* 15 trades.
+  - `sweep_spot.mjs` is a legacy sweep that cannot test the live configuration.
+    `backtest.mjs` with environment variables is the supported path.
+
 ## 1.1.0 — 2026-10-31
 
 Reliability release. Every fix below corresponds to a failure seen in the live paper run.
