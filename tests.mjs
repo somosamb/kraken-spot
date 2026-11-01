@@ -219,6 +219,7 @@ console.log('static guards');
   const rs = readFileSync(`${DIR}/runner.mjs`, 'utf8');
   ok(/entriesAllowed\(net\) \? 'auto' : 'noentry'/.test(rs), 'runner blocks entries unless the network is OK');
   ok(/stdio: 'ignore', detached: true/.test(rs) && /SIGKILL/.test(rs), 'phone notification is detached with a hard kill');
+  ok(/process\.env\.RES_OPTIONS \?\?= 'single-request-reopen'/.test(rs), 'runner process (probe) also uses sequential DNS queries');
   ok(/existsSync\(NET_RESET\)/.test(rs) && /net = initialNet\(t0\)/.test(rs) && /unlinkSync\(NET_RESET\)/.test(rs), 'NET_RESET file forces a clean OK state once (npm run net:reset)');
   const wd = readFileSync(`${DIR}/watchdog.sh`, 'utf8');
   ok(/timeout -s KILL 20 termux-wake-lock/.test(wd) && /KS_WAKELOCK/.test(wd), 'watchdog takes the Termux wake lock with a hard timeout (opt-out KS_WAKELOCK=0)');

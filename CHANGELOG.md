@@ -20,7 +20,7 @@
   - `kraken-calls.log` (slow or failed calls)
   - a `net` line on the dashboard
   - a network check in `validate.mjs`
-- 30 new tests (89 in total) covering every state transition, the network-error
+- 31 new tests (90 in total) covering every state transition, the network-error
   classification, and the 2026-11-01 flapping night.
 
 - **Termux wake lock.** On a phone, Android suspended the CPU with the screen off. That
@@ -40,6 +40,11 @@
 - **`npm run net:reset`** creates `NET_RESET`, which the runner applies on its next cycle
   (no restart): the network monitor returns to `OK`. It is meant for after you move to a
   good link. A bad cycle still degrades it again.
+
+- **The probe failed falsely on the same router.** The DNS fix (`RES_OPTIONS`) only applied
+  to the CLI. The runner's own probe hit the same 5 s glibc stall, which equals the probe
+  timeout, so it reported "probe failed" (5005 ms) while curl answered in 0.3 s. The runner
+  process now sets `RES_OPTIONS=single-request-reopen` as well.
 
 ### Fixed (network monitor, first night in the field)
 - **Flapping not detected.** Overnight the link went back and forth between `DEGRADED` and

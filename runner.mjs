@@ -3,6 +3,10 @@
  * Daemon: runs one trader cycle every TICK_MS in a child process, snapshots equity,
  * and stops for good (writing HALTED) on a confirmed PASS/BUST.
  */
+// Same DNS fix as the CLI (see ctl.mjs CLI_ENV): some routers drop one of the two queries
+// glibc sends together, and the 5 s retry equals the probe timeout, so the probe failed
+// falsely. glibc reads RES_OPTIONS on its first lookup, so it must be set before any fetch.
+process.env.RES_OPTIONS ??= 'single-request-reopen';
 import { snapshot, confirmedVerdict, RULES, DIR, HALTED, takeCallStats } from './ctl.mjs';
 import { initialNet, step as netStep, entriesAllowed, callStats } from './net.mjs';
 import { appendFileSync, writeFileSync, readFileSync, statSync, renameSync, unlinkSync, existsSync } from 'node:fs';
