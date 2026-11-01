@@ -16,6 +16,7 @@ const TICK_MS = 45_000;
 const CYCLE_TIMEOUT_MS = 600_000;
 const MAX_FAILURES = 8;
 const NET_FILE = `${DIR}/net.state.json`;
+const NET_RESET = `${DIR}/NET_RESET`;        // `npm run net:reset`: manual return to OK
 const PROBE_URL = 'https://api.kraken.com/0/public/Time';
 const PROBE_TIMEOUT_MS = 5000;
 const NOTIFY = process.env.KS_NOTIFY !== '0';      // phone notification on network state changes
@@ -106,6 +107,16 @@ async function main() {
     const t0 = Date.now();
 
     // ---- connectivity health: decide whether this cycle may open new positions ----
+    if (existsSync(NET_RESET)) {
+      // manual override (e.g. "I'm on good wifi now"): start from a clean OK state; the
+      // monitor still degrades again on the next bad cycle
+      try { unlinkSync(NET_RESET); } catch { /* raced */ }
+      const msg = `NET ${net.state} -> OK (manual reset); entries enabled`;
+      net = initialNet(t0);
+      prevStart = t0; lastCycleOk = true; lastTraderNet = null; takeCallStats();
+      log('INFO', msg);
+      alertLog(msg);
+    }
     const pr = await probe();
     const own = takeCallStats();         // runner's own CLI calls (snapshot) from the last loop
     const ms = [...(lastTraderNet?.ms ?? []), ...own.ms];

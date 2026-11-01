@@ -20,7 +20,7 @@
   - `kraken-calls.log` (slow or failed calls)
   - a `net` line on the dashboard
   - a network check in `validate.mjs`
-- 29 new tests (88 in total) covering every state transition, the network-error
+- 30 new tests (89 in total) covering every state transition, the network-error
   classification, and the 2026-11-01 flapping night.
 
 - **Termux wake lock.** On a phone, Android suspended the CPU with the screen off. That
@@ -36,6 +36,10 @@
   ~10 min kept the link `INTERMITTENT` and entries blocked all morning. A cycle is now bad
   with **2 or more calls slower than 2.5 s**, or **one call slower than 10 s**. Replaying
   2026-11-01 08:00–08:15 UTC, about 5 of the ~12 bad cycles stay bad.
+
+- **`npm run net:reset`** creates `NET_RESET`, which the runner applies on its next cycle
+  (no restart): the network monitor returns to `OK`. It is meant for after you move to a
+  good link. A bad cycle still degrades it again.
 
 ### Fixed (network monitor, first night in the field)
 - **Flapping not detected.** Overnight the link went back and forth between `DEGRADED` and

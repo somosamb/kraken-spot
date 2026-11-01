@@ -52,6 +52,7 @@ is running, and the watchdog starts it again within 45 s.
 | `HALTED` | bot, on a confirmed PASS/BUST | Runner, watchdog and `kspot` refuse to run | `rm HALTED` after reviewing |
 | `FROZEN` | bot, when the win rate is below 55% over more than 15 strategy trades (`stop`, `target`, `target_fill`, `timestop` since 2026-10-31 14:15 UTC) | No new entries | Clears itself when the win rate recovers. `node trader.mjs unfreeze` forces it. |
 | `FAILURE_SENTINEL` | runner, on a failed cycle | Informational | Clears itself on the next good cycle |
+| `NET_RESET` | you (`npm run net:reset`) | Network monitor returns to `OK` on the next cycle | Deleted by the runner once applied |
 
 The mode (`ENTRY_ENABLED`) is read when the runner starts, so restart after changing it.
 
@@ -100,6 +101,10 @@ The bot runs on a phone, so connectivity is monitored on every cycle.
 | `OFFLINE` | No cycle for more than 5 min, or the probe is down and 2 cycles failed in a row | blocked (and nothing reaches the exchange anyway) |
 
 - **Recovery:** returning to `OK` takes 5 good cycles in a row (~5 min).
+- **Manual override:** run `npm run net:reset` once you know the link is good again (for
+  example, you just joined wifi). The runner picks it up on its next cycle, without a
+  restart, and starts from a clean `OK`. If the link is still bad, the next bad cycle
+  degrades it again.
 - **What you see on each state change:**
   - a `NET A -> B (reason)` line in `bot.log` and `alerts.log`
   - a phone notification (Termux, `KS_NOTIFY=0` to disable)

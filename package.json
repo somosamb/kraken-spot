@@ -13,6 +13,7 @@
     "cycle:dry": "node trader.mjs loop --dry-run",
     "start": "sh kspot",
     "stop": "sh killprocs.sh",
+    "net:reset": "touch NET_RESET",
     "backtest:sweep": "node sweep_spot.mjs"
   }
 }
