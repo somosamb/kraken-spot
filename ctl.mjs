@@ -52,6 +52,14 @@ function parseResult(out) {
 const LOCK_MSG = 'in use by another process';
 export const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
+/**
+ * Environment for the CLI. glibc sends the A and AAAA DNS queries together on one socket;
+ * some routers drop the second, so every lookup waited a 5 s timeout before retrying
+ * (2026-11-01, home wifi: 6.0 s per CLI call -> 0.7 s with this option). Sequential
+ * queries cost at most one extra DNS round trip. An explicit RES_OPTIONS is respected.
+ */
+export const CLI_ENV = { ...process.env, RES_OPTIONS: process.env.RES_OPTIONS ?? 'single-request-reopen' };
+
 /** Calls slower than this, or that needed lock retries, are recorded in kraken-calls.log. */
 const SLOW_CALL_MS = 3000;
 
@@ -95,6 +103,7 @@ export function kraken(args, { allowFail = false, retries = 8, workspace = true 
         stdio: ['ignore', 'pipe', 'pipe'],
         maxBuffer: 32 * 1024 * 1024,
         timeout: 60_000,
+        env: CLI_ENV,
       });
       if (r.error || r.status !== 0) {
         const e = r.error ?? new Error(`exit ${r.status}`);

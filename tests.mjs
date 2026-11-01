@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { riskFor, scaledRiskFor, RISK_MULT } from './riskpolicy.mjs';
 import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom, strategyTrades } from './trader.mjs';
-import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError } from './ctl.mjs';
+import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError, CLI_ENV } from './ctl.mjs';
 import { initialNet, step as netStep, entriesAllowed, p90 } from './net.mjs';
 import { parseFill } from './spot.mjs';
 
@@ -207,6 +207,7 @@ console.log('network monitor');
   ok(isNetworkError('', { code: 'ETIMEDOUT' }) && isNetworkError('getaddrinfo EAI_AGAIN api.kraken.com'), 'timeouts and DNS failures classified as network');
   ok(!isNetworkError('EOrder:Insufficient funds'), 'exchange rejections are not network errors');
   ok(p90([1, 2, 3, 4, 5, 6, 7, 8, 9, 100]) === 100 && p90([]) === 0, 'p90 helper');
+  ok(CLI_ENV.RES_OPTIONS === (process.env.RES_OPTIONS ?? 'single-request-reopen'), 'CLI gets sequential DNS queries (5 s router-drop fix) unless overridden');
 }
 
 console.log('static guards');

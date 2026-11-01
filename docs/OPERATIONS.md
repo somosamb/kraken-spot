@@ -140,6 +140,7 @@ The depth is in ATRs below EMA20. A pair with no tag is a valid candidate.
 | `cycle N failed …` repeated, `FATAL` | Every cycle fails, usually because the CLI or network is down | Run `kraken paper status -o json` by hand. The watchdog restarts the runner automatically. |
 | `validate` FAIL: untracked / missing / size mismatch | State and exchange disagree | Wait one cycle (reconcile fixes it). If it persists, run `npm run cycle:dry` and read `alerts.log`. |
 | `net=DEGRADED(noentry)` or `NET … -> OFFLINE` | Weak or lost signal. The bot keeps managing positions but opens none. | Nothing. It recovers by itself after 5 good cycles (30 clean minutes if `INTERMITTENT`). Check `kraken-calls.log` for details. |
+| `DEGRADED` with a fast probe (< 1 s) but every CLI call ≈ 5–6 s in `kraken-calls.log` | DNS: the router drops one of the two queries glibc sends together, so each lookup waits a 5 s timeout | The bot already sets `RES_OPTIONS=single-request-reopen` for the CLI. If you override `RES_OPTIONS`, keep that option. To diagnose, run `kraken ticker BTC/USD -o json -v` and compare the request and response timestamps. |
 | More than 1 runner or watchdog | Should not happen (`flock`) | `npm stop`, check `pgrep -af runner.mjs`, then `npm start` |
 
 ## Reset the challenge

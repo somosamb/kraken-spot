@@ -32,6 +32,13 @@
 - **`npm stop` killed the in-flight cycle.** `killprocs.sh` now stops the watchdog, waits
   up to 90 s for the running trader cycle to finish, and only then stops the runner.
 - The runbook gained a "Deploying code changes safely" section.
+- **Every CLI call took ~6 s on home wifi.** The network itself was fine: the probe answered
+  in 0.36 s and curl in 0.4 s.
+  - Cause: glibc sends the A and AAAA DNS queries together on one socket (`sendmmsg`). The
+    router dropped the second one, so every lookup waited a 5 s timeout and then retried
+    sequentially. This was confirmed with strace.
+  - Fix: the CLI now runs with `RES_OPTIONS=single-request-reopen`, unless `RES_OPTIONS` is
+    already set. Calls went from 6.0 s to 0.7 s, and a full cycle takes 6 s.
 
 - Added the research scripts behind docs/RESEARCH.md under `research/`:
   - `screen.mjs` (event study)
