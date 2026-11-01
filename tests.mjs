@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { riskFor, scaledRiskFor, RISK_MULT } from './riskpolicy.mjs';
 import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom, strategyTrades } from './trader.mjs';
 import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError, CLI_ENV } from './ctl.mjs';
-import { initialNet, step as netStep, entriesAllowed, p90 } from './net.mjs';
+import { initialNet, step as netStep, entriesAllowed, p90, callStats } from './net.mjs';
 import { parseFill } from './spot.mjs';
 
 let pass = 0, fail = 0;
@@ -163,7 +163,11 @@ console.log('network monitor');
   n = run(n, good(t += M));
   ok(n.state === 'OK', 'back to OK after 5 good cycles');
 
-  ok(netStep(n, { ...good(t + M), calls: { n: 6, netFails: 0, p90: 4000 } }).to === 'DEGRADED', 'slow calls (p90 > 2.5 s) -> DEGRADED');
+  const cs = (ms) => callStats(ms);
+  ok(netStep(n, { ...good(t + M), calls: cs([800, 900, 3102, 700, 850, 900, 750]) }).to === 'OK', 'one mildly slow call (3.1 s, 06:55 case) is tolerated');
+  ok(netStep(n, { ...good(t + M), calls: cs([800, 6267, 6738, 700, 850]) }).to === 'DEGRADED', 'two slow calls in one cycle (07:17 case) -> DEGRADED');
+  ok(netStep(n, { ...good(t + M), calls: cs([800, 16929, 700]) }).to === 'DEGRADED', 'one call over 10 s (07:33 case) -> DEGRADED');
+  ok(callStats([1000, 3000, 12000]).slow === 2 && callStats([1000, 3000, 12000]).maxMs === 12000 && callStats([]).maxMs === 0, 'callStats counts slow calls and max');
   ok(netStep(n, { ...good(t + M), gapS: 150 }).to === 'DEGRADED', 'cycle gap > 120 s -> DEGRADED');
   ok(netStep(n, { ...good(t + M), probeOk: false }).to === 'DEGRADED', 'failed probe alone -> DEGRADED');
   ok(netStep(n, { ...good(t + M), gapS: 400 }).to === 'OFFLINE', 'gap > 5 min (signal lost / phone asleep) -> OFFLINE');

@@ -20,7 +20,7 @@
   - `kraken-calls.log` (slow or failed calls)
   - a `net` line on the dashboard
   - a network check in `validate.mjs`
-- 26 new tests (85 in total) covering every state transition, the network-error
+- 29 new tests (88 in total) covering every state transition, the network-error
   classification, and the 2026-11-01 flapping night.
 
 - **Termux wake lock.** On a phone, Android suspended the CPU with the screen off. That
@@ -30,6 +30,12 @@
     `KS_WAKELOCK=0`.
   - The lock is never released by the bot, because it is shared with other Termux
     processes.
+
+- **Softer slowness rule.** A cycle used to count as bad when its call p90 exceeded 2.5 s.
+  With about 7 calls per cycle that meant a single slow call, so one 3 s call every
+  ~10 min kept the link `INTERMITTENT` and entries blocked all morning. A cycle is now bad
+  with **2 or more calls slower than 2.5 s**, or **one call slower than 10 s**. Replaying
+  2026-11-01 08:00–08:15 UTC, about 5 of the ~12 bad cycles stay bad.
 
 ### Fixed (network monitor, first night in the field)
 - **Flapping not detected.** Overnight the link went back and forth between `DEGRADED` and

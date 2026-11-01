@@ -4,7 +4,7 @@
  * and stops for good (writing HALTED) on a confirmed PASS/BUST.
  */
 import { snapshot, confirmedVerdict, RULES, DIR, HALTED, takeCallStats } from './ctl.mjs';
-import { initialNet, step as netStep, entriesAllowed, p90 } from './net.mjs';
+import { initialNet, step as netStep, entriesAllowed, callStats } from './net.mjs';
 import { appendFileSync, writeFileSync, readFileSync, statSync, renameSync, unlinkSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
@@ -114,7 +114,7 @@ async function main() {
       gapS: Number.isFinite(prevStart) ? (t0 - prevStart) / 1000 : 0,
       probeOk: pr.ok,
       cycleOk: lastCycleOk,
-      calls: { n: ms.length, netFails: (lastTraderNet?.netFails ?? 0) + own.netFails, p90: p90(ms) },
+      calls: callStats(ms, (lastTraderNet?.netFails ?? 0) + own.netFails),
     };
     prevStart = t0;
     const offlineSince = net.state === 'OFFLINE' ? net.since : null;

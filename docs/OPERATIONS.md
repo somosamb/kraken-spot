@@ -95,7 +95,7 @@ The bot runs on a phone, so connectivity is monitored on every cycle.
 | State | Entered when | Entries |
 |---|---|---|
 | `OK` | No problems | allowed |
-| `DEGRADED` | Any of these: a network error, call p90 above 2.5 s, a failed probe, a failed cycle, or more than 120 s between cycles | **blocked** |
+| `DEGRADED` | Any of these: a network error, **2 or more calls slower than 2.5 s** or **one call slower than 10 s** in the cycle, a failed probe, a failed cycle, or more than 120 s between cycles. A single mildly slow call is tolerated. | **blocked** |
 | `INTERMITTENT` | 3 incidents within one hour. An incident is any worsening: leaving `OK`, or dropping to `OFFLINE`. | blocked; needs 30 clean minutes to clear |
 | `OFFLINE` | No cycle for more than 5 min, or the probe is down and 2 cycles failed in a row | blocked (and nothing reaches the exchange anyway) |
 
