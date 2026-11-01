@@ -168,7 +168,8 @@ console.log('network monitor');
   ok(netStep(n, { ...good(t + M), probeOk: false }).to === 'DEGRADED', 'failed probe alone -> DEGRADED');
   ok(netStep(n, { ...good(t + M), gapS: 400 }).to === 'OFFLINE', 'gap > 5 min (signal lost / phone asleep) -> OFFLINE');
 
-  // probe down + 2 failed cycles in a row -> OFFLINE
+  // probe down + 2 failed cycles in a row -> OFFLINE (an hour later, so earlier incidents have expired)
+  t += 61 * M;
   let o = netStep(n, { ...good(t += M), probeOk: false, cycleOk: false });
   ok(o.to === 'DEGRADED', 'probe down + 1 failed cycle -> DEGRADED');
   o = netStep(o.net, { ...good(t += M), probeOk: false, cycleOk: false });
@@ -190,6 +191,17 @@ console.log('network monitor');
   ok(f.state === 'INTERMITTENT' && !entriesAllowed(f), 'INTERMITTENT holds through 10 clean minutes');
   for (let i = 0; i < 25; i++) f = run(f, good(t += M));
   ok(f.state === 'OK', 'INTERMITTENT clears after 30 clean minutes');
+
+  // the 2026-11-01 night: DEGRADED <-> OFFLINE flapping without ever reaching OK
+  let fl = initialNet(0); t = 0;
+  fl = run(fl, { ...good(t += M), probeOk: false });                 // OK -> DEGRADED (incident 1)
+  fl = run(fl, { ...good(t += 7 * M), gapS: 420 });                  // -> OFFLINE (incident 2)
+  fl = run(fl, { ...good(t += M), probeOk: false });                 // -> DEGRADED
+  const fl3 = netStep(fl, { ...good(t += 7 * M), gapS: 400 });       // -> OFFLINE (incident 3)
+  fl = netStep(fl3.net, { ...good(t += M), probeOk: false }).net;    // back online, still flapping
+  ok(fl3.net.incidents.length === 3 && fl.state === 'INTERMITTENT', 'DEGRADED <-> OFFLINE flapping counts as incidents -> INTERMITTENT');
+  for (let i = 0; i < 26; i++) fl = run(fl, good(t += M));
+  ok(fl.state === 'INTERMITTENT' && !entriesAllowed(fl), '27 clean minutes after the last cut: still blocked (the TIA case)');
 
   ok(isNetworkError('Network error: error sending request for url (https://api.kraken.com/0/public/Ticker)'), 'CLI "Network error" classified as network');
   ok(isNetworkError('', { code: 'ETIMEDOUT' }) && isNetworkError('getaddrinfo EAI_AGAIN api.kraken.com'), 'timeouts and DNS failures classified as network');

@@ -28,6 +28,22 @@ A healthy system shows:
 - `runner.state.json` updated within the last ~2 min
 - `src venue` on the dashboard
 
+## Deploying code changes safely
+
+The runner starts a fresh `trader.mjs` for every cycle. Any file the trader imports is
+therefore picked up **immediately**, even if you are halfway through editing it. On
+2026-10-31 this opened a position with half-edited code.
+
+1. `npm stop`. This stops the watchdog first, then waits for the in-flight cycle to finish
+   before stopping the runner.
+2. Edit, then run `npm test`.
+3. `npm run cycle:dry`. This runs one live cycle with entries simulated.
+4. `npm start`, then `npm run validate`.
+
+`runner.mjs` and `net.mjs` are loaded once, when the runner starts. A change to them only
+needs a runner restart between cycles: stop the runner while no `trader.mjs loop` process
+is running, and the watchdog starts it again within 45 s.
+
 ## Control files
 
 | File | Created by | Effect | Clear it |
@@ -80,7 +96,7 @@ The bot runs on a phone, so connectivity is monitored on every cycle.
 |---|---|---|
 | `OK` | No problems | allowed |
 | `DEGRADED` | Any of these: a network error, call p90 above 2.5 s, a failed probe, a failed cycle, or more than 120 s between cycles | **blocked** |
-| `INTERMITTENT` | 3 incidents within one hour | blocked; needs 30 clean minutes to clear |
+| `INTERMITTENT` | 3 incidents within one hour. An incident is any worsening: leaving `OK`, or dropping to `OFFLINE`. | blocked; needs 30 clean minutes to clear |
 | `OFFLINE` | No cycle for more than 5 min, or the probe is down and 2 cycles failed in a row | blocked (and nothing reaches the exchange anyway) |
 
 - **Recovery:** returning to `OK` takes 5 good cycles in a row (~5 min).

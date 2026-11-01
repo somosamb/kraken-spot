@@ -67,7 +67,9 @@ export function step(prev, obs, P = NET) {
   } else {
     net.goodStreak = 0;
     net.lastBadTs = obs.ts;
-    if (from === 'OK') net.incidents.push(obs.ts);                 // a new incident starts
+    // an incident = any worsening: leaving OK, or dropping to OFFLINE from a better state.
+    // (Counting only OK exits missed a night of DEGRADED <-> OFFLINE flapping, 2026-11-01.)
+    if (from === 'OK' || (cls === 'offline' && from !== 'OFFLINE')) net.incidents.push(obs.ts);
     const flapping = net.incidents.length >= P.FLAP_INCIDENTS;
     if (cls === 'offline') to = 'OFFLINE';
     else if (flapping || from === 'INTERMITTENT') to = 'INTERMITTENT';

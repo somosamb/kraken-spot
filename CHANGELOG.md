@@ -20,8 +20,18 @@
   - `kraken-calls.log` (slow or failed calls)
   - a `net` line on the dashboard
   - a network check in `validate.mjs`
-- 21 new tests (80 in total) covering every state transition and the network-error
-  classification.
+- 23 new tests (82 in total) covering every state transition, the network-error
+  classification, and the 2026-11-01 flapping night.
+
+### Fixed (network monitor, first night in the field)
+- **Flapping not detected.** Overnight the link went back and forth between `DEGRADED` and
+  `OFFLINE` about 20 times without ever reaching `INTERMITTENT`, because only leaving `OK`
+  counted as an incident. Now any worsening counts: leaving `OK`, or dropping to `OFFLINE`.
+  With the corrected count, the 00:00 TIA entry, which came 27 min after the last cut,
+  would have been blocked.
+- **`npm stop` killed the in-flight cycle.** `killprocs.sh` now stops the watchdog, waits
+  up to 90 s for the running trader cycle to finish, and only then stops the runner.
+- The runbook gained a "Deploying code changes safely" section.
 
 - Added the research scripts behind docs/RESEARCH.md under `research/`:
   - `screen.mjs` (event study)
