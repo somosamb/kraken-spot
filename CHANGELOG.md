@@ -20,8 +20,16 @@
   - `kraken-calls.log` (slow or failed calls)
   - a `net` line on the dashboard
   - a network check in `validate.mjs`
-- 23 new tests (82 in total) covering every state transition, the network-error
+- 26 new tests (85 in total) covering every state transition, the network-error
   classification, and the 2026-11-01 flapping night.
+
+- **Termux wake lock.** On a phone, Android suspended the CPU with the screen off. That
+  froze the bot for up to 74 min: the CLI calls that "took" 96–315 s were frozen processes.
+  - The watchdog now takes `termux-wake-lock` when it starts and re-asserts it about every
+    45 min. It runs in the background with a hard 20 s limit and is opt-out with
+    `KS_WAKELOCK=0`.
+  - The lock is never released by the bot, because it is shared with other Termux
+    processes.
 
 ### Fixed (network monitor, first night in the field)
 - **Flapping not detected.** Overnight the link went back and forth between `DEGRADED` and

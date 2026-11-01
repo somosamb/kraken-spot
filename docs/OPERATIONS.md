@@ -112,6 +112,29 @@ The bot runs on a phone, so connectivity is monitored on every cycle.
   - `net.state.json`: the current state and the last observation
   - `kraken-calls.log`: every CLI call that was slow (> 3 s), failed, or needed lock retries
 
+## Running on a phone (Termux)
+
+With the screen off, Android suspends the CPU, which freezes the bot. On 2026-11-01 this
+caused gaps between cycles of up to 74 min. During a gap nobody watches the software stop;
+only the resting take-profit stays live on the exchange.
+
+How to spot it: a CLI call or cycle gap that is **longer than the CLI's 60 s timeout**,
+such as `315398ms` in `kraken-calls.log`. That timeout uses a clock that stops during
+suspend, so a longer measurement means the process was frozen. It is not the network.
+
+**Mitigation:**
+
+1. **Wake lock.** The watchdog takes the Termux wake lock (`termux-wake-lock`) when it
+   starts and re-asserts it about every 45 min. Termux then shows "wake lock held" in its
+   notification.
+   - The lock is app-wide, so the bot never releases it: other Termux processes may rely on
+     it. To release it by hand, run `termux-wake-unlock`.
+   - To disable it, set `KS_WAKELOCK=0`.
+2. **Battery optimisation.** In Android settings, set Termux's battery mode to
+   *Unrestricted* / *Don't optimise*. A wake lock keeps the CPU running, but Doze can still
+   cut network access for optimised apps.
+3. **Expect a higher battery drain**, and keep the phone charging where possible.
+
 ## Reading `near=[…]`
 
 `near` lists the five deepest dips among pairs the bot does not hold, as `PAIR:depth(tag)`.
@@ -140,6 +163,7 @@ The depth is in ATRs below EMA20. A pair with no tag is a valid candidate.
 | `cycle N failed …` repeated, `FATAL` | Every cycle fails, usually because the CLI or network is down | Run `kraken paper status -o json` by hand. The watchdog restarts the runner automatically. |
 | `validate` FAIL: untracked / missing / size mismatch | State and exchange disagree | Wait one cycle (reconcile fixes it). If it persists, run `npm run cycle:dry` and read `alerts.log`. |
 | `net=DEGRADED(noentry)` or `NET … -> OFFLINE` | Weak or lost signal. The bot keeps managing positions but opens none. | Nothing. It recovers by itself after 5 good cycles (30 clean minutes if `INTERMITTENT`). Check `kraken-calls.log` for details. |
+| `NET … -> OFFLINE (gap 900s+)` overnight, or calls over 60 s in `kraken-calls.log` | The phone suspended the CPU, not the network | Check that "wake lock held" is shown in Termux and that Termux battery optimisation is off |
 | `DEGRADED` with a fast probe (< 1 s) but every CLI call ≈ 5–6 s in `kraken-calls.log` | DNS: the router drops one of the two queries glibc sends together, so each lookup waits a 5 s timeout | The bot already sets `RES_OPTIONS=single-request-reopen` for the CLI. If you override `RES_OPTIONS`, keep that option. To diagnose, run `kraken ticker BTC/USD -o json -v` and compare the request and response timestamps. |
 | More than 1 runner or watchdog | Should not happen (`flock`) | `npm stop`, check `pgrep -af runner.mjs`, then `npm start` |
 

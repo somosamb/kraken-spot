@@ -108,6 +108,7 @@ Spot paper has **no native stop orders**, so the runner process *is* the stop.
 | False PASS/BUST | Requires confirmation by a second read. |
 | Restart after game over | `HALTED` blocks the runner, the watchdog and `kspot`. |
 | Runner down during a rally | The take-profit rests on the exchange as a limit order. |
+| Phone asleep (Android suspends the CPU with the screen off) | On Termux the watchdog holds the wake lock (`termux-wake-lock`). |
 | Bad or intermittent signal (the bot runs on a phone) | The network monitor (`net.mjs`) blocks new entries unless the link is healthy, and sends a phone notification on every state change. Open positions are always managed. |
 | Losing streak | Entries freeze while the win rate is below 55% over more than 15 strategy exits since v1.2. The freeze clears itself when the win rate recovers. |
 
@@ -155,6 +156,7 @@ Run `node sweep_live.mjs eval '{}'` to reproduce the v1.2 row, or
 | `FBOT_PROTECT` | `off` | any other value enables the break-even stop |
 | `KS_NO_CACHE` | — | `1` disables the daily OHLC cache |
 | `KS_NOTIFY` | on | `0` disables the Termux phone notifications |
+| `KS_WAKELOCK` | on | `0` stops the watchdog from taking the Termux wake lock |
 
 Strategy constants are at the top of `trader.mjs`. The risk ladder is in
 `riskpolicy.mjs`. If you change either, re-run `sweep_live.mjs eval` with the
