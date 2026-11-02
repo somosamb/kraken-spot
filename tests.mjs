@@ -184,18 +184,17 @@ console.log('network monitor');
   for (let i = 0; i < 5; i++) n = run(n, good(t += M));
   ok(n.state === 'OK', 'OFFLINE -> DEGRADED -> OK after 5 good cycles');
 
-  // flapping: 3 incidents within an hour -> INTERMITTENT, sticky for 30 clean minutes
+  // flapping: 3 incidents within an hour -> INTERMITTENT; recovers like DEGRADED (5 good cycles)
   let f = initialNet(0); t = 0;
   for (let k = 0; k < 3; k++) {
     f = run(f, { ...good(t += M), probeOk: false });
-    for (let i = 0; i < 5; i++) f = run(f, good(t += M));
+    if (k < 2) for (let i = 0; i < 5; i++) f = run(f, good(t += M));
   }
-  ok(f.state === 'INTERMITTENT', '3 incidents within an hour -> INTERMITTENT');
-  for (let i = 0; i < 10; i++) f = run(f, good(t += M));
-  ok(f.state === 'INTERMITTENT' && !entriesAllowed(f), 'INTERMITTENT holds through 10 clean minutes');
-  for (let i = 0; i < 25; i++) f = run(f, good(t += M));
-  ok(f.state === 'OK', 'INTERMITTENT clears after 30 clean minutes');
-
+  ok(f.state === 'INTERMITTENT' && !entriesAllowed(f), '3 incidents within an hour -> INTERMITTENT, entries blocked');
+  for (let i = 0; i < 4; i++) f = run(f, good(t += M));
+  ok(f.state === 'INTERMITTENT', 'still INTERMITTENT after 4 good cycles');
+  f = run(f, good(t += M));
+  ok(f.state === 'OK' && entriesAllowed(f), 'INTERMITTENT -> OK after 5 good cycles (no extra clean period)');
   // the 2026-11-01 night: DEGRADED <-> OFFLINE flapping without ever reaching OK
   let fl = initialNet(0); t = 0;
   fl = run(fl, { ...good(t += M), probeOk: false });                 // OK -> DEGRADED (incident 1)
@@ -204,8 +203,10 @@ console.log('network monitor');
   const fl3 = netStep(fl, { ...good(t += 7 * M), gapS: 400 });       // -> OFFLINE (incident 3)
   fl = netStep(fl3.net, { ...good(t += M), probeOk: false }).net;    // back online, still flapping
   ok(fl3.net.incidents.length === 3 && fl.state === 'INTERMITTENT', 'DEGRADED <-> OFFLINE flapping counts as incidents -> INTERMITTENT');
-  for (let i = 0; i < 26; i++) fl = run(fl, good(t += M));
-  ok(fl.state === 'INTERMITTENT' && !entriesAllowed(fl), '27 clean minutes after the last cut: still blocked (the TIA case)');
+  for (let i = 0; i < 4; i++) fl = run(fl, good(t += M));
+  ok(fl.state === 'INTERMITTENT' && !entriesAllowed(fl), 'flapping link still blocked after 4 good cycles');
+  fl = run(fl, good(t += M));
+  ok(fl.state === 'OK', 'flapping link recovers after 5 good cycles in a row');
 
   ok(isNetworkError('Network error: error sending request for url (https://api.kraken.com/0/public/Ticker)'), 'CLI "Network error" classified as network');
   ok(isNetworkError('', { code: 'ETIMEDOUT' }) && isNetworkError('getaddrinfo EAI_AGAIN api.kraken.com'), 'timeouts and DNS failures classified as network');

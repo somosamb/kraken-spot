@@ -97,7 +97,7 @@ The bot runs on a phone, so connectivity is monitored on every cycle.
 |---|---|---|
 | `OK` | No problems | allowed |
 | `DEGRADED` | Any of these: a network error, **2 or more calls slower than 2.5 s** or **one call slower than 10 s** in the cycle, a failed probe, a failed cycle, or more than 120 s between cycles. A single mildly slow call is tolerated. | **blocked** |
-| `INTERMITTENT` | 3 incidents within one hour. An incident is any worsening: leaving `OK`, or dropping to `OFFLINE`. | blocked; needs 30 clean minutes to clear |
+| `INTERMITTENT` | 3 incidents within one hour. An incident is any worsening: leaving `OK`, or dropping to `OFFLINE`. | blocked; recovers like `DEGRADED` (5 good cycles). The label shows the link is flapping. |
 | `OFFLINE` | No cycle for more than 5 min, or the probe is down and 2 cycles failed in a row | blocked (and nothing reaches the exchange anyway) |
 
 - **Recovery:** returning to `OK` takes 5 good cycles in a row (~5 min).
@@ -167,7 +167,7 @@ The depth is in ATRs below EMA20. A pair with no tag is a valid candidate.
 | `RECONCILE …: cannot adopt yet` | No trade history or ATR was available for that holding | The bot retries each cycle. If it persists, sell the holding by hand. |
 | `cycle N failed …` repeated, `FATAL` | Every cycle fails, usually because the CLI or network is down | Run `kraken paper status -o json` by hand. The watchdog restarts the runner automatically. |
 | `validate` FAIL: untracked / missing / size mismatch | State and exchange disagree | Wait one cycle (reconcile fixes it). If it persists, run `npm run cycle:dry` and read `alerts.log`. |
-| `net=DEGRADED(noentry)` or `NET … -> OFFLINE` | Weak or lost signal. The bot keeps managing positions but opens none. | Nothing. It recovers by itself after 5 good cycles (30 clean minutes if `INTERMITTENT`). Check `kraken-calls.log` for details. |
+| `net=DEGRADED(noentry)` or `NET … -> OFFLINE` | Weak or lost signal. The bot keeps managing positions but opens none. | Nothing. It recovers by itself after 5 good cycles. Check `kraken-calls.log` for details. |
 | `NET … -> OFFLINE (gap 900s+)` overnight, or calls over 60 s in `kraken-calls.log` | The phone suspended the CPU, not the network | Check that "wake lock held" is shown in Termux and that Termux battery optimisation is off |
 | `DEGRADED` with a fast probe (< 1 s) but every CLI call ≈ 5–6 s in `kraken-calls.log` | DNS: the router drops one of the two queries glibc sends together, so each lookup waits a 5 s timeout | The bot already sets `RES_OPTIONS=single-request-reopen` for the CLI. If you override `RES_OPTIONS`, keep that option. To diagnose, run `kraken ticker BTC/USD -o json -v` and compare the request and response timestamps. |
 | More than 1 runner or watchdog | Should not happen (`flock`) | `npm stop`, check `pgrep -af runner.mjs`, then `npm start` |

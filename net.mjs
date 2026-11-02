@@ -7,8 +7,8 @@
  *
  *   OK            healthy: normal operation
  *   DEGRADED      recent network failure, slow calls, a failed probe or a long cycle gap
- *   INTERMITTENT  repeated incidents within an hour — like DEGRADED, but needs a long clean
- *                 period before returning to OK
+ *   INTERMITTENT  repeated incidents within an hour — handled like DEGRADED (entries blocked,
+ *                 5 good cycles to recover); the label shows the link is flapping
  *   OFFLINE       exchange unreachable, or no cycle for a long time (signal lost, phone asleep)
  *
  * Each runner loop feeds one observation:
@@ -29,7 +29,7 @@ export const NET = {
   RECOVER_CYCLES: 5,             // consecutive good cycles to return to OK (hysteresis)
   FLAP_WINDOW_MS: 60 * 60_000,   // incidents counted over the last hour…
   FLAP_INCIDENTS: 3,             // …this many make the link INTERMITTENT
-  INTERMITTENT_CLEAN_MS: 30 * 60_000,
+  INTERMITTENT_CLEAN_MS: 0,      // extra clean time for INTERMITTENT; 0 = 5 good cycles suffice (2026-11-02)
 };
 
 export const entriesAllowed = (net) => net?.state === 'OK';

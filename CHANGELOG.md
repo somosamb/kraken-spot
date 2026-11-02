@@ -46,6 +46,10 @@
   timeout, so it reported "probe failed" (5005 ms) while curl answered in 0.3 s. The runner
   process now sets `RES_OPTIONS=single-request-reopen` as well.
 
+- **`INTERMITTENT` recovers with 5 good cycles.** Before, it also needed 30 clean minutes
+  (`INTERMITTENT_CLEAN_MS` is now 0). On 2026-11-02 that rule kept entries blocked for hours
+  on a link that was mostly fine. The state is still reported, so you can see the flapping.
+
 ### Fixed (network monitor, first night in the field)
 - **Flapping not detected.** Overnight the link went back and forth between `DEGRADED` and
   `OFFLINE` about 20 times without ever reaching `INTERMITTENT`, because only leaving `OK`
