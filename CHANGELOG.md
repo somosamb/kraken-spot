@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.1 — 2026-11-03
+
+### Changed (risk)
+- **Open-risk cap tied to the cushion.**
+  - Before: total open risk was capped only at $75. Each single trade is a fraction of the
+    cushion, but with 3 concurrent positions the risks added up. On 2026-11-03 TIA, NEAR and
+    ARB risked $18.92 of a $21.10 cushion, so three simultaneous stops would have left
+    equity about $1–2 above the floor, and below it with any slippage.
+  - Now: total open risk may not exceed 50% of (equity − floor). New entries beyond that are
+    tagged `risk` in `near`. Open positions are never cut, so the three positions above were
+    kept.
+  - Cost, measured with `sweep_live.mjs` (`CUSHION_FRAC`): historical PASSes drop from 9/48
+    to 4/48 (median 485 days), with 0 BUST either way. The 2-year sample never had several
+    stops at once, so this is insurance against a tail the backtest did not contain.
+
 ## Unreleased
 
 ### Added

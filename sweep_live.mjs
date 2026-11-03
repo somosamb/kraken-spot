@@ -26,8 +26,8 @@ export const LIVE_V1 = {
   EMA200: true, REGIME: true, MAXC: 2, CORR: 0.65, RISK_MULT: 1, CAP_MULT: 1,
   NOTIONAL: 0.20, FREEZE: true, FREEZE_WR: 0.55, MIN_ATR_PCT: 0,
 };
-/** Live configuration v1.2: ATR floor 3%, risk ×3, 3 positions, 35% notional cap. */
-export const LIVE = { ...LIVE_V1, MIN_ATR_PCT: 3, RISK_MULT: 3, MAXC: 3, NOTIONAL: 0.35 };
+/** Live configuration v1.2.1: ATR floor 3%, risk ×3, 3 positions, 35% notional cap, open risk ≤ 50% of cushion. */
+export const LIVE = { ...LIVE_V1, MIN_ATR_PCT: 3, RISK_MULT: 3, MAXC: 3, NOTIONAL: 0.35, CUSHION_FRAC: 0.5 };
 
 // ---- indicators (precomputed once per series) -------------------------------
 function emaSeries(v, p) {
@@ -147,7 +147,9 @@ export function run(D, P, start, end = D.n) {
     let used = 0;
     for (const q of Object.values(pos)) used += q.risk;
     const cap = PORTFOLIO_CAP * P.CAP_MULT;
-    let allowed = Math.min(riskFor(eqClose) * ratchetFor(eqClose) * P.RISK_MULT, cap, Math.max(0, cap - used));
+    // CUSHION_FRAC: total open risk capped at this fraction of (equity − floor), as live v1.2.1
+    const cushionRoom = P.CUSHION_FRAC ? Math.max(0, P.CUSHION_FRAC * (eqClose - FLOOR) - used) : Infinity;
+    let allowed = Math.min(riskFor(eqClose) * ratchetFor(eqClose) * P.RISK_MULT, cap, Math.max(0, cap - used), cushionRoom);
     for (const c of cands) {
       if (Object.keys(pos).length >= P.MAXC || allowed <= 0) break;
       const stopDist = P.STOP_ATR * c.a;

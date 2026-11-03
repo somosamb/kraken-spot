@@ -43,14 +43,25 @@ export function openRisk(pos) {
   return Math.abs(pos.entry - pos.stopPx) * pos.size;
 }
 
+/**
+ * Total open risk (sum of entry−stop distance × size over all positions) may not exceed
+ * this fraction of the cushion above the floor. Each single trade is already a fraction of
+ * the cushion, but with 3 concurrent positions the risks add up: on 2026-11-03 three
+ * positions risked $18.92 of a $21.10 cushion, so three simultaneous stops would have left
+ * equity ~$1–2 above the floor. Applies to new entries only; open positions are never cut.
+ */
+export const CUSHION_RISK_FRACTION = 0.5;
+
 export function budgetFor(equity, state) {
   const policy = scaledRiskFor(equity);
   let used = 0;
   for (const p of Object.values(state?.positions ?? {})) used += openRisk(p);
-  const room = Math.max(0, PORTFOLIO_CAP - used);
+  const cushionCap = Math.max(0, CUSHION_RISK_FRACTION * (equity - FLOOR));
+  const room = Math.max(0, Math.min(PORTFOLIO_CAP, cushionCap) - used);
   return {
     policy,
     used: +used.toFixed(4),
+    cushionCap: +cushionCap.toFixed(4),
     room: +room.toFixed(4),
     allowed: +Math.min(policy, room).toFixed(4),
     cappedByPolicy: room < policy,

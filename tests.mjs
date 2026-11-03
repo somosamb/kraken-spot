@@ -3,7 +3,7 @@
  * Pure unit tests — no network, no exchange calls. Run: node tests.mjs
  */
 import { readFileSync } from 'node:fs';
-import { riskFor, scaledRiskFor, RISK_MULT } from './riskpolicy.mjs';
+import { riskFor, scaledRiskFor, RISK_MULT, budgetFor } from './riskpolicy.mjs';
 import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom, strategyTrades } from './trader.mjs';
 import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError, CLI_ENV } from './ctl.mjs';
 import { initialNet, step as netStep, entriesAllowed, p90, callStats } from './net.mjs';
@@ -23,6 +23,16 @@ ok(riskFor(970) === 0, 'risk 0 at floor');
 ok(near(scaledRiskFor(1000), riskFor(1000) * RISK_MULT, 1e-3) && RISK_MULT === 3, 'policy = ladder x3 below the ratchet');
 ok(scaledRiskFor(1119) === 75, 'policy capped at $75');
 ok(scaledRiskFor(970) === 0, 'policy 0 at floor (cushion-proportional: losing streaks cannot reach it)');
+{
+  const pos = (entry, stop, size) => ({ entry, stopPx: stop, size });
+  const nov3 = { positions: { a: pos(0.4729, 0.4014, 95.806), b: pos(3.8668, 3.2286, 9.495), c: pos(0.1554, 0.1372, 330.2) } };
+  const b3 = budgetFor(991.10, nov3);
+  ok(b3.used > 18.5 && b3.cushionCap === 10.55 && b3.allowed === 0, 'Nov-3 case: $18.9 open on a $21.1 cushion -> no new entry (cap 50% = $10.55)');
+  ok(budgetFor(1000, { positions: {} }).allowed === scaledRiskFor(1000), 'flat book: the per-trade policy is the limit');
+  const two = budgetFor(1000, { positions: { a: pos(10, 9, 6), b: pos(10, 9, 6) } });
+  ok(two.used === 12 && two.allowed === 3, 'two $6 risks at $1000: only $3 room left under the $15 cushion cap');
+  ok(budgetFor(970, { positions: {} }).allowed === 0, 'at the floor: no room');
+}
 
 console.log('verdict');
 ok(verdict(1120) === 'PASS' && verdict(970) === 'BUST' && verdict(1000) === 'RUNNING', 'PASS / BUST / RUNNING thresholds');

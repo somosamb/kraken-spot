@@ -155,7 +155,8 @@ The depth is in ATRs below EMA20. A pair with no tag is a valid candidate.
 | `cooldown` | The pair was closed earlier today (UTC) |
 | `corr:XXX` | Correlated above 0.65 with held position XXX |
 | `drift` | The live price moved more than 0.5 ATR from the signal close |
-| `full` | 3 positions are already open, or the risk budget is used up |
+| `full` | 3 positions are already open |
+| `risk` | Total open risk already uses 50% of the cushion above the floor |
 
 ## Troubleshooting
 

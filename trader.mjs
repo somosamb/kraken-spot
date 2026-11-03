@@ -523,7 +523,8 @@ function entry(state, cur, holdings, dryRun = false) {
   if (cands.length) { try { live = lastPrices(cands.map(c => c.pair)); } catch { /* every candidate counts as drifted */ } }
   let allowed = budgetFor(cur, state).allowed;
   for (const sig of cands) {
-    if (Object.keys(state.positions).length >= MAX_CONCURRENT || allowed <= 0) { sig.reason = 'full'; continue; }
+    if (Object.keys(state.positions).length >= MAX_CONCURRENT) { sig.reason = 'full'; continue; }
+    if (allowed <= 0) { sig.reason = 'risk'; continue; }        // open-risk budget used up (cushion cap)
     // correlation against everything held now, including entries made earlier in this loop
     const blocker = blockedByCorr(sig.pair, Object.keys(state.positions));
     if (blocker) { sig.reason = `corr:${blocker.split('/')[0]}`; continue; }

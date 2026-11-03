@@ -70,7 +70,8 @@ Each cycle runs four steps:
    | Cooldown | the pair was not closed earlier the same UTC day | `cooldown` |
    | Correlation | 60-day correlation is at most 0.65 against every held position, including ones opened earlier in the same cycle | `corr:XXX` |
    | Price drift | the live price is within 0.5 ATR of the signal close | `drift` |
-   | Capacity | at most 3 positions, risk budget left, and the pair is not already held | `full` |
+   | Capacity | at most 3 positions, and the pair is not already held | `full` |
+   | Open-risk budget | total open risk stays within 50% of the cushion | `risk` |
 
    Candidates are ranked by dip depth, deepest first. The five deepest pairs and their
    reject tags appear in each `bot.log` line as `near=[…]`.
@@ -89,7 +90,9 @@ equity.
 - It is multiplied by 1.5× from $1015 and by 2× from $1045.
 - Since v1.2 everything is multiplied by **×3** (`RISK_MULT`). At $1000 that is about $8
   of risk per trade.
-- Total open risk is capped at **$75**.
+- Total open risk is capped at **50% of the cushion** above the floor (and never above $75).
+  For example, at $991 the cap is $10.5. This only limits new entries; open positions are
+  never cut.
 - Each position's notional is capped at **35% of equity**.
 
 The risk is a fraction of the remaining cushion, so a losing streak on its own can't reach
@@ -133,7 +136,8 @@ Spot paper has **no native stop orders**, so the runner process *is* the stop.
 | Configuration | Expectancy per trade | PASS / 48 starts | BUST | Median days to PASS |
 |---|---|---|---|---|
 | v1.1 (×1 risk, 2 positions) | +0.31 R | 0 | 0 | — |
-| **v1.2** (ATR ≥ 3%, ×3 risk, 3 positions, 35% notional) | **+0.43 R** | **9** | **0**, also with worst-case stop fills | 445 |
+| v1.2 (ATR ≥ 3%, ×3 risk, 3 positions, 35% notional) | +0.43 R | 9 | 0, also with worst-case stop fills | 445 |
+| **v1.2.1** (v1.2 + open risk ≤ 50% of cushion) | **+0.43 R** | **4** | **0** | 485 |
 
 Caveats, in order of importance:
 
@@ -143,7 +147,10 @@ Caveats, in order of importance:
    few quiet BTC days), and results fall off a cliff below a 2.75% threshold.
 3. With 19 smaller alt pairs added, worst-case stop fills do cause BUSTs.
 
-Run `node sweep_live.mjs eval '{}'` to reproduce the v1.2 row, or
+The cushion cap halves the historical PASSes, because it blocks 2nd and 3rd entries that won
+in 2025. It guards against several stops hitting at once, which never happened in the
+2-year sample. Run `node sweep_live.mjs eval '{}'` to reproduce the v1.2.1 row
+(`'{"CUSHION_FRAC":0}'` for v1.2), or
 `BASE=v1 node sweep_live.mjs eval '{}'` for v1.1.
 
 ## Configuration
