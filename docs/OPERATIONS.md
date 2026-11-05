@@ -89,7 +89,8 @@ The bot runs on a phone, so connectivity is monitored on every cycle.
 **Inputs:**
 - the CLI calls of the previous cycle: latency, plus network errors and network warnings
   on stderr
-- a direct probe to `api.kraken.com/0/public/Time` (5 s limit)
+- a direct probe to `api.kraken.com/0/public/Time` (5 s limit). It only runs when something
+  looks wrong, plus every 10th cycle as a heartbeat.
 - whether the last cycle completed
 - the time since the previous cycle
 
