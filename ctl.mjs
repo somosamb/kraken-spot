@@ -230,16 +230,30 @@ export function chooseEquity(venue, own, tolerance = VALUATION_TOLERANCE) {
   throw new Error('equity unavailable: venue valuation incomplete and own valuation failed');
 }
 
-export function equity() {
+/**
+ * Equity with the venue/own cross-check. Pass `bal` and/or `prices` already fetched this
+ * cycle to avoid repeating CLI calls; anything missing is fetched. Prices for holdings not
+ * in `prices` are fetched as well, so a stale/partial map can never hide a holding.
+ */
+export function equity({ bal = null, prices = null } = {}) {
   const st = status();
-  const bal = balance();
+  if (!bal) bal = balance();
   let own = null;
   if (bal) {
-    try { own = ownValuation(bal, lastPrices(Object.keys(holdingsFrom(bal)))); } catch { own = null; }
+    try {
+      const pairs = Object.keys(holdingsFrom(bal));
+      const known = prices ?? {};
+      const missing = pairs.filter(p => !Number.isFinite(known[p]));
+      const px = missing.length ? { ...known, ...lastPrices(missing) } : known;
+      own = ownValuation(bal, px);
+    } catch { own = null; }
   }
   const c = chooseEquity(st, own);
   return { ...c, st, bal };
 }
+
+/** Compact, JSON-safe equity reading a trader cycle hands to the runner (no re-query). */
+export const equitySummary = (e) => ({ cur: e.cur, source: e.source, rejected: e.rejected ?? null, ts: Date.now() });
 
 export function verdict(cur) {
   if (cur >= RULES.target) return 'PASS';
@@ -261,8 +275,15 @@ export function confirmedVerdict(first, delayMs = 5000) {
   return { verdict: 'RUNNING', cur: second.cur, glitch: { first: first.cur, second: second.cur } };
 }
 
-export function snapshot(note = '') {
-  const e = equity();
+/**
+ * Record an equity snapshot. `pre` = an equitySummary from the trader cycle that just ran
+ * (saves the runner 3 CLI calls); without it, or if it is older than 2 min, equity is read.
+ */
+/** True if a trader-supplied equity reading can be reused (valid and under 2 min old). */
+export const freshPre = (pre, now = Date.now()) => !!pre && Number.isFinite(pre.cur) && now - (pre.ts ?? 0) < 120_000;
+
+export function snapshot(note = '', pre = null) {
+  const e = freshPre(pre) ? { cur: pre.cur, source: pre.source, rejected: pre.rejected } : equity();
   const { cur } = e;
   const s = loadState();
   s.peak = Math.max(s.peak, cur);

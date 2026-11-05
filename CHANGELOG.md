@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.2.2 — 2026-11-05
+
+### Changed (fewer API calls)
+- **CLI calls per cycle went from 11 to 3**, roughly 16,000 to 4,400 per day at the current
+  cadence. Strategy behaviour is unchanged.
+  - **One read per cycle.** The trader reads the balance once and the prices once (one
+    batched ticker). Reconcile, manage and the equity valuation share them. The balance is
+    read again only if the cycle traded (dirty flag).
+  - **No repeat in the runner.** The trader hands its equity reading to the runner
+    (`equity` in the cycle summary, reused only if under 2 min old). The runner no longer
+    repeats `status`, `balance` and `ticker` for its snapshot.
+  - **Less frequent stale-order sweep.** `paper orders` runs every 10 min, and immediately
+    after any trade or reconcile change, instead of every cycle. Take-profit fills are still
+    detected through the balance.
+  - **Probe only when needed.** It runs only when something looks wrong (state not `OK`, a
+    failed or slow cycle, network errors, a long gap), plus a heartbeat every 10 cycles.
+    The dashboard shows the last measured probe.
+- **Verified against the live exchange** (2026-11-05):
+  - one trader cycle made 3 calls, versus 7 before
+  - the equity reading was identical to the old method (difference $0.0000)
+  - 3 end-to-end runner cycles made 9 calls in total, none of them from the runner
+  - `validate.mjs` passed
+- Test hooks: `KS_TICK_MS` and `KS_MAX_CYCLES` make the runner do N short cycles.
+  8 new tests (103 in total).
+
 ## 1.2.1 — 2026-11-03
 
 ### Changed (risk)

@@ -8,7 +8,7 @@
 // falsely. glibc reads RES_OPTIONS on its first lookup, so it must be set before any fetch.
 process.env.RES_OPTIONS ??= 'single-request-reopen';
 import { snapshot, confirmedVerdict, RULES, DIR, HALTED, takeCallStats } from './ctl.mjs';
-import { initialNet, step as netStep, entriesAllowed, callStats } from './net.mjs';
+import { initialNet, step as netStep, entriesAllowed, callStats, slowCycle, NET } from './net.mjs';
 import { appendFileSync, writeFileSync, readFileSync, statSync, renameSync, unlinkSync, existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 
@@ -16,7 +16,8 @@ const LOG = `${DIR}/bot.log`;
 const ALERTS = `${DIR}/alerts.log`;
 const SENTINEL = `${DIR}/FAILURE_SENTINEL`;
 const STATE_FILE = `${DIR}/runner.state.json`;
-const TICK_MS = 45_000;
+const TICK_MS = +(process.env.KS_TICK_MS || 45_000);          // override only for tests
+const MAX_CYCLES = +(process.env.KS_MAX_CYCLES || Infinity);   // test hook: stop after N cycles
 const CYCLE_TIMEOUT_MS = 600_000;
 const MAX_FAILURES = 8;
 const NET_FILE = `${DIR}/net.state.json`;
@@ -24,6 +25,7 @@ const NET_RESET = `${DIR}/NET_RESET`;        // `npm run net:reset`: manual retu
 const PROBE_URL = 'https://api.kraken.com/0/public/Time';
 const PROBE_TIMEOUT_MS = 5000;
 const NOTIFY = process.env.KS_NOTIFY !== '0';      // phone notification on network state changes
+const PROBE_EVERY = 10;                            // heartbeat probe every N cycles even when healthy
 let cycle = 0;
 let failures = 0;
 
@@ -105,8 +107,9 @@ async function main() {
   let prevStart = lastRunnerTs();        // first gap covers any downtime before this start
   let lastCycleOk = true;
   let lastTraderNet = null;
+  let lastProbeMs = null;
 
-  while (true) {
+  while (cycle < MAX_CYCLES) {
     cycle++;
     const t0 = Date.now();
 
@@ -121,7 +124,14 @@ async function main() {
       log('INFO', msg);
       alertLog(msg);
     }
-    const pr = await probe();
+    // The probe costs a request every cycle; only run it when something looks wrong
+    // (state not OK, failed/slow cycle, network errors, long gap) or as a periodic heartbeat.
+    const gapNow = Number.isFinite(prevStart) ? (t0 - prevStart) / 1000 : 0;
+    const lastStats = callStats(lastTraderNet?.ms ?? [], lastTraderNet?.netFails ?? 0);
+    const needProbe = net.state !== 'OK' || !lastCycleOk || lastStats.netFails > 0 || slowCycle(lastStats)
+      || gapNow > NET.GAP_DEGRADED_S || cycle % PROBE_EVERY === 1;
+    const pr = needProbe ? await probe() : { ok: true, ms: null, skipped: true };
+    if (!pr.skipped) lastProbeMs = pr.ms;
     const own = takeCallStats();         // runner's own CLI calls (snapshot) from the last loop
     const ms = [...(lastTraderNet?.ms ?? []), ...own.ms];
     const obs = {
@@ -135,7 +145,7 @@ async function main() {
     const offlineSince = net.state === 'OFFLINE' ? net.since : null;
     const st = netStep(net, obs);
     net = st.net;
-    try { writeFileSync(NET_FILE, JSON.stringify({ net, lastObs: obs, reason: st.reason, probeMs: pr.ms }, null, 2)); } catch { /* ignore */ }
+    try { writeFileSync(NET_FILE, JSON.stringify({ net, lastObs: obs, reason: st.reason, probeMs: lastProbeMs, probeSkipped: !!pr.skipped }, null, 2)); } catch { /* ignore */ }
     if (st.changed) {
       const away = offlineSince ? ` after ${Math.round((t0 - offlineSince) / 60000)} min offline` : '';
       const msg = `NET ${st.from} -> ${st.to} (${st.reason})${away}; entries ${entriesAllowed(net) ? 'enabled' : 'blocked'}`;
@@ -166,7 +176,7 @@ async function main() {
     if (parsed?.halted) { log('INFO', 'trader reports HALTED — stopping'); break; }
 
     let g;
-    try { g = snapshot('runner'); }
+    try { g = snapshot('runner', parsed?.equity); }   // reuse the trader's reading: no extra CLI calls
     catch (e) {
       log('WARN', `snapshot failed (will retry): ${String(e.message).slice(0, 200)}`);
       setRunnerState({ status: 'RUNNING', equity: null, progress: null });

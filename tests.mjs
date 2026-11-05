@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { riskFor, scaledRiskFor, RISK_MULT, budgetFor } from './riskpolicy.mjs';
 import { analyse, screen, inCooldown, priceDrifted, corrWith, diffPositions, ledgerHas, barsFrom, strategyTrades } from './trader.mjs';
-import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError, CLI_ENV } from './ctl.mjs';
+import { chooseEquity, ownValuation, holdingsFrom, verdict, confirmedVerdict, DIR, isNetworkError, CLI_ENV, freshPre } from './ctl.mjs';
 import { initialNet, step as netStep, entriesAllowed, p90, callStats } from './net.mjs';
 import { parseFill } from './spot.mjs';
 
@@ -223,6 +223,22 @@ console.log('network monitor');
   ok(!isNetworkError('EOrder:Insufficient funds'), 'exchange rejections are not network errors');
   ok(p90([1, 2, 3, 4, 5, 6, 7, 8, 9, 100]) === 100 && p90([]) === 0, 'p90 helper');
   ok(CLI_ENV.RES_OPTIONS === (process.env.RES_OPTIONS ?? 'single-request-reopen'), 'CLI gets sequential DNS queries (5 s router-drop fix) unless overridden');
+}
+
+console.log('call budget (fewer CLI calls per cycle)');
+{
+  const now = 1_000_000;
+  ok(freshPre({ cur: 998.6, source: 'venue', ts: now - 30_000 }, now), "trader's equity reading reused by the runner when fresh");
+  ok(!freshPre({ cur: 998.6, ts: now - 180_000 }, now) && !freshPre(null, now) && !freshPre({ cur: NaN, ts: now }, now), 'stale, missing or invalid readings are re-queried');
+  const tr = readFileSync(`${DIR}/trader.mjs`, 'utf8');
+  const mainSrc = tr.slice(tr.indexOf('async function main('));
+  ok((mainSrc.match(/= balance\(\)/g) || []).length === 1, 'one balance() per cycle in main');
+  ok(/equity\(\{ bal: dirty \? null : bal, prices \}\)/.test(mainSrc), 'equity reuses the cycle balance and prices; re-reads balance only after a trade');
+  ok(/reconcile\(state, held, closed, prices\)/.test(mainSrc) && /manage\(state, prices, \{ sweep: sweepDue \}\)/.test(mainSrc), 'reconcile and manage share one batched ticker');
+  ok(/equity: equitySummary\(g\)/.test(tr), 'trader hands its equity reading to the runner');
+  const rn = readFileSync(`${DIR}/runner.mjs`, 'utf8');
+  ok(/snapshot\('runner', parsed\?\.equity\)/.test(rn), 'runner snapshot uses the trader reading (no extra calls)');
+  ok(/needProbe \?/.test(rn) && /PROBE_EVERY/.test(rn), 'probe only when something looks wrong, plus a periodic heartbeat');
 }
 
 console.log('static guards');

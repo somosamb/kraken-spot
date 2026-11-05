@@ -11,7 +11,7 @@
 import {
   DIR, KRAKEN, equity, verdict, confirmedVerdict, loadState, saveState, ohlc, lastPrice,
   lastPrices, paperOrders, paperHistory, balance, holdingsFrom, FEE_PER_SIDE, DUST_USD, HALTED,
-  takeCallStats,
+  takeCallStats, equitySummary,
 } from './ctl.mjs';
 import { buy, sell, limitSell, cancel, cancelPair } from './spot.mjs';
 import { budgetFor } from './riskpolicy.mjs';
@@ -58,6 +58,14 @@ function alert(msg) {
 const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const norm = (p) => String(p ?? '').replace('/', '');
 const floor8 = (n) => Math.floor(n * 1e8) / 1e8;
+
+/** Prices for `pairs`, reusing `known` (fetched earlier this cycle); only missing ones are queried. */
+function pricesFor(pairs, known = {}) {
+  const missing = pairs.filter(p => !Number.isFinite(known[p]));
+  if (!missing.length) return known;
+  try { return { ...known, ...lastPrices(missing) }; } catch { return known; }
+}
+const SWEEP_EVERY_MS = 10 * 60_000;   // stale-order sweep cadence (also runs right after any trade)
 
 // ---- math helpers ---------------------------------------------------------
 function ema(values, period) {
@@ -345,10 +353,9 @@ function inferEntry(trades, pair) {
   return { entry: cost / vol, fee, openedAt: new Date(buys[0].ts).toISOString() };
 }
 
-function reconcile(state, holdings, closed) {
+function reconcile(state, holdings, closed, known = {}) {
   const pairs = [...new Set([...Object.keys(holdings), ...Object.keys(state.positions)])];
-  let prices = {};
-  try { prices = lastPrices(pairs); } catch { /* unpriced pairs are treated conservatively */ }
+  const prices = pricesFor(pairs, known);   // unpriced pairs are treated conservatively
   const d = diffPositions(state.positions, holdings, prices);
   if (!d.orphans.length && !d.gone.length && !d.resized.length) return d;
 
@@ -420,12 +427,11 @@ function closePosition(state, sym, pos, price, reason) {
   return res;
 }
 
-function manage(state) {
+function manage(state, known = {}, { sweep = true } = {}) {
   const closed = [];
   const now = Date.now();
   const syms = Object.keys(state.positions);
-  let prices = {};
-  try { prices = lastPrices(syms); } catch { /* skip this cycle */ }
+  const prices = pricesFor(syms, known);
   for (const sym of syms) {
     const pos = state.positions[sym];
     const price = prices[sym];
@@ -448,7 +454,7 @@ function manage(state) {
       }
     }
   }
-  sweepStale(state);
+  if (sweep || closed.length) { sweepStale(state); state.lastSweep = new Date().toISOString(); }
   return closed;
 }
 
@@ -602,16 +608,23 @@ async function main() {
     if (pw.fetched || pw.failed) logLine(`prewarm: refreshed=${pw.fetched} failed=${pw.failed} of ${pw.total}`);
   } catch (e) { logLine(`prewarm failed: ${e.message}`); }
 
+  // One balance and one batched ticker per cycle, shared by reconcile, manage and equity.
+  // Anything that trades marks the cycle dirty, and the balance is then read again.
   const state = loadState();
   const bal = balance();
   if (!bal) throw new Error('balance unavailable');
+  const held = holdingsFrom(bal);
+  const prices = pricesFor([...new Set([...Object.keys(held), ...Object.keys(state.positions)])]);
   const closed = [];
-  const rec = reconcile(state, holdingsFrom(bal), closed);
+  const rec = reconcile(state, held, closed, prices);
+  let dirty = rec.orphans.length + rec.gone.length + rec.resized.length > 0;
 
-  const closedByManage = manage(state);
+  const sweepDue = dirty || !state.lastSweep || Date.now() - Date.parse(state.lastSweep) >= SWEEP_EVERY_MS;
+  const closedByManage = manage(state, prices, { sweep: sweepDue });
   closed.push(...closedByManage);
+  if (closedByManage.length) dirty = true;
 
-  const g = equity();
+  const g = equity({ bal: dirty ? null : bal, prices });
   const holdings = holdingsFrom(g.bal ?? bal);
   const er = noEntry ? { entered: [], near: [] } : entry(state, g.cur, holdings, dryRun);
 
@@ -637,6 +650,7 @@ async function main() {
     frozen: !!er.frozen,
     reconciled: { orphans: rec.orphans.length, gone: rec.gone.length, resized: rec.resized.length },
     equitySource: g.source,
+    equity: equitySummary(g),
     net: takeCallStats(),
   }));
 }
